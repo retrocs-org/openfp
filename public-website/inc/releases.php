@@ -182,19 +182,28 @@ function render_release_downloads(array $catalog): void
         <div class="download-heading" id="download"><h3 id="play-game">Play a game</h3><span class="small muted">Game clients</span></div>
         <ul class="client-downloads">
           <?php foreach ([
-              'macos' => ['macOS', 'Apple silicon + Intel', 'macOS 11 or newer.'],
-              'windows' => ['Windows', 'Intel / AMD · x86_64', '64-bit Windows. Minimum OS version is still being verified.'],
-              'linux-x86_64' => ['Linux', 'Intel / AMD · x86_64', 'openSUSE Leap 16 (preferred); SDL2 and libcurl.'],
-              'linux-aarch64' => ['Linux', 'ARM64', 'openSUSE Leap 16 (preferred); SDL2 and libcurl.'],
-              'amiga' => ['AmigaOS', 'm68k · ECS', 'AmigaOS 3.0+ · 68040/68060 · 2 MB Chip + 8 MB Fast RAM (16 MB Fast recommended).'],
-          ] as $key => [$title, $architecture, $requirements]): ?>
+              'macos' => ['macOS', 'Apple silicon + Intel', 'Apple silicon or Intel Mac.', 'To be confirmed.', 'macOS 11 or newer.'],
+              'windows' => ['Windows', 'Intel / AMD · x86_64', '64-bit Intel or AMD processor.', 'To be confirmed.', '64-bit Windows. Minimum OS version is still being verified.'],
+              'linux-x86_64' => ['Linux', 'Intel / AMD · x86_64', '64-bit Intel or AMD processor.', 'To be confirmed.', 'openSUSE Leap 16 (preferred); SDL2 and libcurl.'],
+              'linux-aarch64' => ['Linux', 'ARM64', 'ARM64 processor.', 'To be confirmed.', 'openSUSE Leap 16 (preferred); SDL2 and libcurl.'],
+              'amiga' => ['AmigaOS', 'm68k · ECS', '68040 or 68060, ECS graphics, 2 MB Chip RAM and 8 MB Fast RAM.', '16 MB Fast RAM.', 'AmigaOS 3.0 or newer. A compatible TCP/IP stack is needed for online play.'],
+          ] as $key => [$title, $architecture, $minimum, $recommended, $software]): ?>
             <li class="client-download-row">
-              <div><h4><?= h($title) ?></h4><p class="download-architecture"><?= h($architecture) ?></p><p class="download-requirements"><span>Minimum requirements</span> <?= h($requirements) ?></p></div>
+              <div class="client-download-info">
+                <h4><?= h($title) ?></h4><p class="download-architecture"><?= h($architecture) ?></p>
+                <div class="client-requirements">
+                  <h5>Hardware requirements</h5>
+                  <dl><div><dt>Minimum</dt><dd><?= h($minimum) ?></dd></div><div><dt>Recommended</dt><dd><?= h($recommended) ?></dd></div></dl>
+                  <?php if ($key !== 'amiga'): ?><p class="requirements-detail">Memory and graphics requirements are still being measured.</p><?php endif; ?>
+                  <h5>Software requirements</h5>
+                  <p><?= h($software) ?></p>
+                  <?php if (str_starts_with($key, 'linux-')): ?><p class="requirements-detail">Other distributions can build from <a href="/source/">source</a>.</p><?php endif; ?>
+                </div>
+              </div>
               <div class="client-download-actions"><?php render_release_actions($groups[$key] ?? null, $status); ?></div>
             </li>
           <?php endforeach; ?>
         </ul>
-        <p class="note requirements-note">Desktop memory and graphics requirements are still being measured. openSUSE Leap 16 is the preferred Linux platform; other distributions can build from <a href="/source/">source</a>.</p>
       </section>
       <section class="server-download-panel" id="server-downloads" aria-labelledby="host-game">
         <div class="server-download-heading"><p class="eyebrow">Your server. Your battlefield.</p><h3 id="host-game">Host a game.</h3><p>Linux dedicated server</p></div>
