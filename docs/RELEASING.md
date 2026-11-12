@@ -2,7 +2,7 @@
 
 Use Python 3.9 or newer from the source root. The release tool builds the game,
 checks its packages, prepares a manifest for review and publishes those same
-files to GitLab, GitHub and, optionally, Aminet. Existing platform packaging
+files to GitHub and, optionally, Aminet. Existing platform packaging
 scripts still work on their own.
 
 The workflow uses the same command structure and external settings approach as
@@ -58,15 +58,13 @@ then the older ignored `work/release-config.json`. Without any settings file,
 is an error. `plan` prints which path is selected.
 
 Keep machine paths, signing profile names and credential lookup details outside
-the checkout. Actual API tokens and passwords never belong in the JSON. Destinations:
+the checkout. Actual API tokens and passwords never belong in the JSON.
+The public repository is <https://github.com/retrocs-org/openfp>.
 
-* GitLab: <https://gitlab.kladhest.se/retrocs-org/openfp>
-* GitHub: <https://github.com/retrocs-org/openfp>
-
-HTTPS repository URLs and their Git transport URLs must name the same repository.
-Nested GitLab groups are supported. Other GitLab installations need both their
-repository URL and `gitlab_host` configured. Repositories must already exist.
-Git uses your normal SSH key or credential helper; API tokens do not authenticate Git pushes.
+Its HTTPS repository URL and Git transport URL must name the same repository.
+Create the repository before pushing. Git uses your normal SSH key or credential
+helper; API tokens do not authenticate Git pushes. Use `--to github` for public
+source pushes and releases; other destinations may be configured privately.
 
 The version comes from `OFP_VERSION` in `src/common/net.h`. CMake's project version
 must agree. A version of `0.1` gives tag `v0.1`; `prepare --tag 0.1` selects the
@@ -78,8 +76,8 @@ release; never move a published tag or replace different assets under that versi
 ## Source-only repository updates
 
 ```sh
-python3 scripts/release.py source --to gitlab,github --dry-run
-python3 scripts/release.py source --to gitlab,github --confirm-push
+python3 scripts/release.py source --to github --dry-run
+python3 scripts/release.py source --to github --confirm-push
 ```
 
 This checks every selected destination before pushing the current committed
@@ -89,13 +87,13 @@ Git pushes use your existing SSH key or credential helper, separately from API
 credentials. No force or mirror push is used.
 
 For this extracted source, start in the directory containing `scripts/release.py`.
-Create both empty repositories and configure your Git author name/email and SSH
-access first. The configured destinations are GitLab and GitHub above.
+Create the empty public repository and configure your Git author name/email and
+SSH access first.
 
 For the first import into new, empty repositories only:
 
 ```sh
-python3 scripts/release.py source --init --dry-run --commit-message "OpenFP source release"
+python3 scripts/release.py source --to github --init --dry-run --commit-message "OpenFP source release"
 ```
 
 `--init` verifies all selected remotes are empty and checks the Git author
@@ -104,15 +102,15 @@ source files. The dry run uploads nothing, but **can create that first local
 commit**. It respects `.gitignore`; ignored required source must be reviewed and
 tracked first. It refuses a project nested inside another checkout or remotes
 with existing history. Existing committed checkouts get no extra commit.
-Review the local commit, then upload the source to both repositories:
+Review the local commit, then upload the source to the public repository:
 
 ```sh
 git show --stat --oneline HEAD
-python3 scripts/release.py source --to gitlab,github --confirm-push
+python3 scripts/release.py source --to github --confirm-push
 ```
 
-For later source updates, commit the reviewed edits, run `source --dry-run`, then
-`source --confirm-push`. These commands push source only; they do not publish a
+For later source updates, commit the reviewed edits, run `source --to github --dry-run`, then
+`source --to github --confirm-push`. These commands push source only; they do not publish a
 tagged binary release or deploy the website.
 
 ## Before the first public upload
@@ -311,18 +309,12 @@ and manifest. Review it before publication. The category is `game/actio`.
 
 ## Publishing
 
-By default, provide `GITHUB_TOKEN` and `GITLAB_TOKEN` through a hidden prompt or
-a CI secret store. Alternatively, configure 1Password lookups in the external JSON:
+Provide `GITHUB_TOKEN` through a hidden prompt or an environment variable.
+Alternatively, configure a 1Password lookup in the external JSON:
 
 ```json
 {
   "credentials": {
-    "gitlab": {
-      "provider": "1password",
-      "vault": "Your vault",
-      "item": "Your GitLab item",
-      "field": "org/openfp-rw"
-    },
     "github": {
       "provider": "1password",
       "reference": "op://YourVault/YourItem/YourField"
@@ -346,12 +338,9 @@ documentation.
 Environment providers can select a different variable:
 `"github": {"provider": "env", "variable": "GITHUB_TOKEN"}`.
 Do not paste tokens into commands, configuration or notes. Do not enable
-shell tracing. GitHub needs repository Contents write access; GitLab needs the
-`api` scope and at least project Developer access, plus permission to create the
-chosen tag. The GitLab adapter inspects its token through the
-[token self-information endpoint](https://docs.gitlab.com/api/personal_access_tokens/#self-inform)
-before uploading; use a personal or project access token supporting that endpoint.
-Normal Git authentication must also work for both destinations.
+shell tracing. GitHub needs repository Contents write access and permission to
+create the chosen tag. Normal Git authentication must also work for the public
+repository.
 
 For an interactive **Bash** shell, prompts keep tokens out of command history:
 
@@ -359,42 +348,36 @@ For an interactive **Bash** shell, prompts keep tokens out of command history:
 read -r -s -p 'GitHub token: ' GITHUB_TOKEN
 printf '\n'
 export GITHUB_TOKEN
-read -r -s -p 'GitLab token: ' GITLAB_TOKEN
-printf '\n'
-export GITLAB_TOKEN
-python3 scripts/release.py publish --to gitlab,github --confirm-publish
-unset GITHUB_TOKEN GITLAB_TOKEN
+python3 scripts/release.py publish --to github --confirm-publish
+unset GITHUB_TOKEN
 ```
 
 To prepare and publish verified builds in one explicit operation:
 
 ```sh
-python3 scripts/release.py release --tag v0.1 --to gitlab,github --confirm-publish
+python3 scripts/release.py release --tag v0.1 --to github --confirm-publish
 ```
 
 This performs the same full checks as separate `prepare` and `publish`. It does
 not build missing targets. Use separate commands when you want to inspect the
 manifest between preparation and upload.
 
-Add `aminet` to `--to` only after preparing its readme, or select any single
-destination. Destination names must be distinct. Omitting `--to` means
-`gitlab,github`; omitting `--confirm-publish` refuses publication.
+Add `aminet` to `--to github` only after preparing its readme. Destination names
+must be distinct. Specify `--to` explicitly to avoid selecting other configured
+destinations. Omitting `--confirm-publish` refuses publication.
 
 All selected services and remote tags are checked before any tag push or upload.
 Only an annotated release tag is created/pushed, at the reviewed commit. Publication
 does not push source branches; that is the separate `source` command. Existing
 tags must resolve to the same commit and are never
 force-moved. GitHub uploads go into a draft; every asset needs an equal, known
-SHA-256 digest before the draft is made public. GitLab package downloads are
-streamed and verified before creating a release linking them. Existing equal
-assets are reused; different or unknown bytes, titles, notes or links stop the run.
+SHA-256 digest before the draft is made public. Existing equal assets are reused;
+different or unknown bytes, titles, notes or links stop the run.
 These checks reduce partial publication; several services cannot be one atomic transaction.
 
-The adapters use the official [GitHub release API](https://docs.github.com/en/rest/releases/releases)
-and [release asset digests](https://github.blog/changelog/2025-06-03-releases-now-expose-digests-for-release-assets/),
-and GitLab's [release API](https://docs.gitlab.com/api/releases/) and
-[generic packages API](https://docs.gitlab.com/user/packages/generic_packages/).
-Neither `gh` nor `glab` is required. Aminet uses anonymous FTP to
+The public release adapter uses the official [GitHub release API](https://docs.github.com/en/rest/releases/releases)
+and [release asset digests](https://github.blog/changelog/2025-06-03-releases-now-expose-digests-for-release-assets/).
+The `gh` CLI is not required. Aminet uses anonymous FTP to
 `main.aminet.net:/new`, uploading the LHA first and readme last. Successful
 submission means **awaiting moderation**, not already publicly listed.
 
@@ -423,6 +406,6 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_release
 
 Tests use fake APIs and temporary Git repositories. They never contact a release
 service or submit an Aminet upload. Optional installed packaging tools are exercised
-with tiny fixture payloads. Ordinary GitLab CI runs these tests; tag pushes no longer
-trigger a separate automatic uploader. Exercise publication against dedicated test
-repositories before using the first production release tag.
+with tiny fixture payloads. Run these checks manually; automatic repository jobs
+are disabled for now. A tag push does not build or upload packages. Exercise
+publication against a dedicated test repository before the first production release.

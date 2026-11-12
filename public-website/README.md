@@ -2,7 +2,8 @@
 
 This folder is the whole web side of OpenFP:
 
-* **The web site:** `/`, `/server/` (the live server list), `/play/`, `/build/`, `/screenshots/` and `/maps/`.
+* **The web site:** `/`, `/server/` (the live server list), `/play/`, `/activity/`,
+  `/source/` and `/maps/`. Screenshots are on the home page.
 * **The listing API:** `/api/`. Dedicated servers announce themselves to it, and
   the game's FIND SERVERS reads from it.
 
@@ -10,7 +11,7 @@ It is self-contained and is itself the document root. The listing keeps its
 data in **MariaDB**; the site stores nothing of its own.
 
 ```
-index.php  server/  matches/  leaders/  ladders/  play/  build/  maps/  screenshots/  assets/
+index.php  server/  activity/  play/  source/  maps/  assets/
 api/                                 the listing API
 inc/                                 the shared code; migrations.php, migrate.php   (never served)
 config.inc.example.php               the settings: copy to config.inc.php   (never served)
@@ -58,8 +59,8 @@ install -Dm644 OpenFirePower-0.1-source.tar.gz "$webroot/assets/releases/OpenFir
 ```
 
 Keep the live `config.inc.php`, database and existing downloads. Check that
-`index.php`, `build/index.php`, `maps/index.php` and `assets/bundled-maps.json`
-are directly under the active document root. Verify `/build/`, `/maps/` and
+`index.php`, `source/index.php`, `maps/index.php` and `assets/bundled-maps.json`
+are directly under the active document root. Verify `/source/`, `/maps/` and
 `/assets/bundled-maps.json` through the public hostname. If the files are in
 the right place and Apache still serves old PHP, check its document root and
 PHP opcode-cache settings.
@@ -77,9 +78,8 @@ a2enmod php8
 ### Tagged downloads
 
 The home page's Get section and `/play/#download` read published stable releases
-from GitHub (`retrocs-org/openfp`) and GitLab (`gitlab.kladhest.se/retrocs-org/openfp`).
-GitHub links are preferred; GitLab supplies missing packages or a fallback during
-an outage. No access token or database change is needed. The web host needs
+from GitHub (`retrocs-org/openfp`). No access token or database change is needed.
+The web host needs
 outbound HTTPS and either PHP cURL or HTTPS streams with `allow_url_fopen`.
 
 Only published releases with numeric tags such as `0.1` or `v0.1` are shown.
@@ -100,7 +100,7 @@ contain public metadata only and are kept outside the document root.
 Uploading a tagged release through `scripts/release.py` updates the downloads
 automatically after the cache refresh. Copying files into `assets/releases/`
 alone does not advertise them as released. Existing local mirrors can remain
-there, but the download list and server panel use the tagged GitHub/GitLab metadata.
+there, but the download list and server panel use the tagged GitHub metadata.
 
 The client update endpoint (`/api/?action=version`) uses the same release data,
 returns an empty version before any binary release, and works without the listing
@@ -561,7 +561,7 @@ Unpack the new version as in step 1, then `php inc/migrate.php up`. New settings
 ## Ladders
 
 A ladder is a season on chosen servers, set up in `config.inc.php`, with its standings
-on `/ladders/` worked out from the match history: a win is 3 points, ties go to more
+under `/activity/?view=ladders` worked out from the match history: a win is 3 points, ties go to more
 wins, then the bigger rating gain. With `teams`, fixed teams are ranked too (a team
 plays when one of its members does, and wins when they do). Nothing is stored for it:
 change the dates or the servers and the table follows.
@@ -592,7 +592,7 @@ Servers can play them: `maps = gallery:NAME` in `server.cfg`. To take one down, 
 
 ## The daily challenge
 
-`/daily/` shows each day's board. Games send a win's replay; the site checks that it is
+`/activity/?view=daily` shows each day's board. Games send a win's replay; the site checks that it is
 that day's battlefield and keeps each player's fastest. To count only real wins, put
 `ofp_match` on the web host (`cmake --build build-server`, copy `build-server/ofp_match`
 to e.g. `/usr/local/bin/`) and set `'ofp_match' => '/usr/local/bin/ofp_match'` under
@@ -687,10 +687,25 @@ falls back to that repository, so an existing deployment gains the link without
 replacing its database configuration.
 
 Current screenshots live in `assets/img/20261111-*.png`, with captions and platform
-labels in `inc/screenshots.php`. The home page shows highlights; `/screenshots/`
-shows the complete set without cropping. These are rendered game/editor frames,
+labels in `inc/screenshots.php`. The home page shows highlights and an expandable
+gallery with the complete set, without cropping. The former `/screenshots/` route
+redirects to the home page gallery. These are rendered game/editor frames,
 not concept artwork. Keep the full game frame and leave out desktop window borders.
 
-Deploy the complete website update archive, including `inc/`, `screenshots/`,
-`assets/`, and `maps/`. Keep the server’s existing `config.inc.php` and uploaded
+Deploy the complete website update archive, including `inc/`, `activity/`,
+`source/`, `assets/`, and `maps/`, plus the compatibility redirect folders. Keep the server’s existing `config.inc.php` and uploaded
 files. The full deployment instructions above describe database migrations.
+
+
+## Navigation
+
+`/play/` separates **Play a Game** client downloads from **Host a Game** server
+packages. `/activity/` groups Leaderboard, Daily challenge and Matches into
+bookmarkable tabs; configured ladders also appear there. Mode, date, server and
+pagination filters stay in each tab's URL. `/source/` contains the source downloads
+and build instructions. The header links to the home page screenshot section;
+GitHub remains in the footer.
+
+Old `/build/`, `/leaders/`, `/daily/`, `/matches/`, `/ladders/` and `/screenshots/`
+URLs redirect to their new locations, preserving relevant query parameters.
+Deploy the redirect folders too so existing bookmarks keep working.

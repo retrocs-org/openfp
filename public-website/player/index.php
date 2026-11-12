@@ -23,7 +23,7 @@ function rating_line(array $h): string
 ?>
 <section class="wrap">
 <?php if ($name === ''): ?>
-  <h1>Player</h1><p class="notice">Which player? Pick one from the <a href="/leaders/">leaderboard</a>.</p>
+  <h1>Player</h1><p class="notice">Which player? Pick one from the <a href="/activity/?view=leaders">leaderboard</a>.</p>
 <?php elseif ($p === null): ?>
   <h1><?= h($name) ?></h1><p class="notice">The match history isn't available right now.</p>
 <?php elseif (!$p['matches']): ?>
@@ -31,7 +31,7 @@ function rating_line(array $h): string
 <?php else: ?>
   <h1><?= h($p['name']) ?></h1>
   <p class="lead">
-    <?php if ($host): ?>On <a href="/matches/?server=<?= h(urlencode("$host:$port")) ?>"><?= h(reset($p['servers'])) ?></a>.
+    <?php if ($host): ?>On <a href="/activity/?view=matches&amp;server=<?= h(urlencode("$host:$port")) ?>"><?= h(reset($p['servers'])) ?></a>.
     <a href="?name=<?= h(urlencode($p['name'])) ?>">All servers &rarr;</a>
     <?php else: ?>On <?= count($p['servers']) ?> server<?= count($p['servers']) === 1 ? '' : 's' ?>:
       <?php $i = 0; foreach ($p['servers'] as $k => $sn): ?><?= $i++ ? ', ' : '' ?><a href="?name=<?= h(urlencode($p['name'])) ?>&amp;server=<?= h(urlencode($k)) ?>"><?= h($sn) ?></a><?php endforeach; ?>.

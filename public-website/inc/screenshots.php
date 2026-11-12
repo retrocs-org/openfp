@@ -20,11 +20,11 @@ function site_screenshots(): array
         ['20261111-desktop-controllers', 'Controller diagnostics', 'Inspect controller assignment and adjust stick deadzones in Tools.', 384, 216, false],
     ];
 }
-function render_screenshots(bool $highlights = false): void
+function render_screenshots(bool $highlights = false, bool $extras = false): void
 {
     echo '<div class="gallery screenshots">';
     foreach (site_screenshots() as [$file, $title, $description, $width, $height, $highlight]) {
-        if ($highlights && !$highlight) continue;
+        if (($highlights && !$highlight) || ($extras && $highlight)) continue;
         $src = '/assets/img/' . $file . '.png';
         echo '<figure><a href="' . h($src) . '" data-zoom><img src="' . h($src) . '" alt="' . h($title)
            . '" width="' . $width . '" height="' . $height . '" loading="lazy"></a><figcaption><b>'

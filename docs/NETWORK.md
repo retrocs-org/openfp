@@ -558,7 +558,7 @@ protocol, its oldest, its version), and the game explains which side needs updat
 runs an older OpenFirePower: it needs updating". The server list marks old servers.
 
 The game also asks the listing once at start for the newest release
-(`/api/?action=version`; discovered from published tagged GitHub/GitLab releases) and says so in
+(`/api/?action=version`; discovered from published tagged GitHub releases) and says so in
 the menu when it's older. `check_updates=0` in `settings.ini` turns that off.
 
 ### Joining from the game

@@ -37,5 +37,5 @@
 - Dedicated-server configuration, statistics and service installation tools.
 - Public website with screenshots, map gallery, match history, leaderboards,
   build guides and tagged-release downloads.
-- Release automation for GitHub, GitLab and optional Aminet submission, including
+- Release automation for GitHub and optional Aminet submission, including
   source archives, installers and checksums.

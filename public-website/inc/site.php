@@ -46,12 +46,10 @@ function page_start(string $title, string $page, string $description = ''): void
 {
     $cfg = site();
     $full = $title === $cfg['site_name'] ? $title : "$title · {$cfg['site_name']}";
-    $nav = ['index' => ['Home', '/'], 'servers' => ['Servers', '/server/'], 'matches' => ['Matches', '/matches/'],
-            'leaders' => ['Leaderboard', '/leaders/'], 'daily' => ['Daily', '/daily/'], 'maps' => ['Maps', '/maps/']];
-    if (ofp_ladders()) $nav['ladders'] = ['Ladders', '/ladders/'];   // (only when there are any)
-    $nav['screenshots'] = ['Screenshots', '/screenshots/'];
-    $nav['play'] = ['Play', '/play/'];
-    $nav['build'] = ['Build', '/build/'];
+    $nav = ['index' => ['Home', '/'], 'play' => ['Play', '/play/'],
+            'servers' => ['Servers', '/server/'], 'activity' => ['Activity', '/activity/'],
+            'maps' => ['Maps', '/maps/'], 'screenshots' => ['Screenshots', '/#screenshots'],
+            'source' => ['Source', '/source/']];
     ?><!doctype html>
 <html lang="en">
 <head>
@@ -64,7 +62,7 @@ function page_start(string $title, string $page, string $description = ''): void
 <meta property="og:image" content="<?= h($cfg['base_url']) ?>/assets/img/20261111-desktop-classic.png">
 <meta name="theme-color" content="#12120e">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/assets/site.css?v=20261112-2">
+<link rel="stylesheet" href="/assets/site.css?v=20261112-3">
 </head>
 <body class="page-<?= h($page) ?>">
 <header class="top">
@@ -74,7 +72,6 @@ function page_start(string $title, string $page, string $description = ''): void
       <?php foreach ($nav as $key => [$label, $href]): ?>
         <a href="<?= h($href) ?>"<?= $key === $page ? ' aria-current="page"' : '' ?>><?= h($label) ?></a>
       <?php endforeach; ?>
-      <?php if ($cfg['repo_url']): ?><a href="<?= h($cfg['repo_url']) ?>" class="ext">GitHub</a><?php endif; ?>
     </nav>
   </div>
 </header>

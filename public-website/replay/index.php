@@ -22,7 +22,7 @@ page_start($m ? 'Replay: ' . ($m['map'] === 'random' ? 'a random battlefield' : 
       · <a href="/api/?action=replay&amp;id=<?= (int)$m['id'] ?>">Download the replay</a></p>
   <?php else: ?>
     <p class="lead">Drop an <code>.ofprep</code> file here (the game keeps them under REPLAYS), or pick a match
-      from the <a href="/matches/">history</a>.</p>
+      from the <a href="/activity/?view=matches">history</a>.</p>
   <?php endif; ?>
   <div class="viewer" data-replay="<?= $m ? (int)$m['id'] : '' ?>" data-daily="<?= $daily_id ?: '' ?>" data-live="<?= h($live) ?>">
     <canvas width="512" height="512" aria-label="The battlefield"></canvas>

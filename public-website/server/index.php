@@ -119,7 +119,7 @@ page_start('Servers', 'servers', 'Public OpenFP servers right now: players, matc
               <span class="leader"><b><?= $i + 1 ?></b> <?= h($l['name']) ?> <span class="muted"><?= (int)$l['rating'] ?></span></span>
             <?php endforeach; ?>
           <?php else: ?><span class="muted small">No rated matches yet.</span><?php endif; ?>
-          <a class="small" href="/matches/?server=<?= h(urlencode($s['host'] . ':' . $s['port'])) ?>">Matches &rarr;</a>
+          <a class="small" href="/activity/?view=matches&amp;server=<?= h(urlencode($s['host'] . ':' . $s['port'])) ?>">Matches &rarr;</a>
         </div>
         <div class="s-addr">
           <code><?= h($s['host']) ?>:<?= (int)$s['port'] ?></code>

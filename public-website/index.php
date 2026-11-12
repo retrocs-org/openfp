@@ -15,7 +15,7 @@ page_start(site()['site_name'], 'index');
     <div class="cta">
       <a class="btn primary" href="#get">Get the game</a>
       <a class="btn" href="/server/">Find a server<?php if ($t['players']): ?> · <?= (int)$t['players'] ?> online<?php endif; ?></a>
-      <a class="btn" href="/build/">Build from source</a>
+      <a class="btn" href="/source/">Build from source</a>
     </div>
     <ul class="live" data-live>
       <li><b data-k="servers"><?= (int)$t['servers'] ?></b> servers</li>
@@ -69,12 +69,15 @@ page_start(site()['site_name'], 'index');
   </div>
 </section>
 
-<section class="gallery-band">
+<section class="gallery-band" id="screenshots">
   <div class="wrap">
     <h2>Screenshots</h2>
     <p>Current desktop and native 16-colour AmigaOS views. Open an image to see the full frame.</p>
     <?php require_once __DIR__ . '/inc/screenshots.php'; render_screenshots(true); ?>
-    <p><a class="btn" href="/screenshots/">More screenshots</a></p>
+    <details class="gallery-more">
+      <summary>More screenshots</summary>
+      <?php render_screenshots(false, true); ?>
+    </details>
   </div>
 </section>
 
@@ -86,8 +89,8 @@ page_start(site()['site_name'], 'index');
   <div>
     <h2>Build from source</h2>
     <p>Build the game for Linux, macOS, Windows or AmigaOS. The dedicated server can run on Linux without a desktop or SDL.</p>
-    <a class="btn" href="/build/">Client build steps</a>
-    <a class="btn" href="/build/#server">Host a server</a>
+    <a class="btn" href="/source/">Client build steps</a>
+    <a class="btn" href="/source/#server">Host a server</a>
   </div>
 </section>
 <?php page_end();

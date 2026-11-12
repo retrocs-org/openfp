@@ -51,13 +51,12 @@ tmux new -s soak 'tools/soak.sh --hours 24 --bots 6 --extras --near-wrap'
 `--near-wrap` starts the clock 30 minutes before it wraps (day 49.7 of uptime), so the
 soak goes through it; `--listing URL` announces on a listing too; `--help` lists the rest.
 
-## CI
+## Manual checks
 
-`.gitlab-ci.yml`: Linux with GCC (every test) and clang (the fixtures, the network,
-fuzzing), the Windows game (MinGW, its fingerprint read under Wine), the web site's
-WebAssembly core, and macOS where there's a runner tagged `macos` (set `MACOS_RUNNER`).
-Each writes its rules fingerprint; `same-rules-everywhere` runs `tools/compare_rules.sh`
-and fails if any build would compute a different game.
+Automatic repository jobs are disabled for now. Run the build and release tests
+manually using [BUILDING.md](BUILDING.md) and [RELEASING.md](RELEASING.md).
+To compare rules across platforms, save each build's `ofp_server --version`
+output as `rules-NAME.txt`, then run `sh tools/compare_rules.sh rules-*.txt`.
 
 ## The balance test
 
@@ -96,10 +95,10 @@ clang -std=c99 -O2 -Isrc -o /tmp/clang_match src/core/*.c src/common/replay.c sr
 for f in tests/replays/*.ofprep; do /tmp/clang_match verify "$f"; done      # every checksum should match
 ```
 
-In CI (`.gitlab-ci.yml`) every build plays the fixtures: `linux-clang` (ctest's `same_game_*`),
-`webassembly` (`node tools/replays_wasm.js tests/replays/*.ofprep`). The
-`amiga-core-cross-build` job also checks that the core compiles for a 68040.
-Run the native replay checks below to validate an Amiga build. A new mode or rule worth guarding gets a fixture:
+Run the CTest `same_game_*` fixtures after native builds. Check the WebAssembly
+core with `node tools/replays_wasm.js tests/replays/*.ofprep` after building it
+with `sh tools/build_web.sh`. Run the native replay checks below to validate an
+Amiga build. A new mode or rule worth guarding gets a fixture:
 `ofp_match bots --seed N --extras X --out tests/replays/NAME.ofprep`.
 
 ## Windows test kit

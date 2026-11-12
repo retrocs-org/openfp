@@ -2,53 +2,39 @@
 // SPDX-License-Identifier: MIT
 // Public tagged downloads; no local package is advertised as a published release.
 const OFP_RELEASE_GITHUB = 'https://github.com/retrocs-org/openfp';
-const OFP_RELEASE_GITLAB = 'https://gitlab.kladhest.se/retrocs-org/openfp';
 const OFP_RELEASE_LIMIT = 2097152;
 
 function ofp_release_hosts(): array
 {
     return [
         'github' => ['repo' => OFP_RELEASE_GITHUB, 'api' => 'https://api.github.com/repos/retrocs-org/openfp/releases?per_page=30'],
-        'gitlab' => ['repo' => OFP_RELEASE_GITLAB, 'api' => 'https://gitlab.kladhest.se/api/v4/projects/retrocs-org%2Fopenfp/releases?per_page=30'],
     ];
 }
 
 function ofp_release_payload(array $raw, string $provider, int $now): ?array
 {
+    if ($provider !== 'github') return null;
     $tag = $raw['tag_name'] ?? '';
     if (!is_string($tag) || !preg_match('/^v?([0-9]+\.[0-9]+(?:\.[0-9]+)?)$/D', $tag, $match)) return null;
     $version = $match[1];
-    $github = $provider === 'github';
-    if (!isset(ofp_release_hosts()[$provider])) return null;
-    if ($github && (($raw['draft'] ?? true) !== false || ($raw['prerelease'] ?? true) !== false)) return null;
-    if (!$github && ($raw['upcoming_release'] ?? false)) return null;
-    $date = $raw[$github ? 'published_at' : 'released_at'] ?? null;
+    if (($raw['draft'] ?? true) !== false || ($raw['prerelease'] ?? true) !== false) return null;
+    $date = $raw['published_at'] ?? null;
     if (!is_string($date) || ($published = strtotime($date)) === false || $published > $now) return null;
-    $repo = ofp_release_hosts()[$provider]['repo'];
-    $items = $github ? ($raw['assets'] ?? null) : ($raw['assets']['links'] ?? null);
+    $repo = OFP_RELEASE_GITHUB;
+    $items = $raw['assets'] ?? null;
     if (!is_array($items)) return null;
     $assets = [];
     foreach ($items as $item) {
         if (!is_array($item)) continue;
         $name = $item['name'] ?? '';
         if (!is_string($name) || !preg_match('/^[A-Za-z0-9][A-Za-z0-9._-]{0,180}$/D', $name) || isset($assets[$name])) continue;
-        if ($github) {
-            $url = $item['browser_download_url'] ?? '';
-            $expected = $repo . '/releases/download/' . rawurlencode($tag) . '/' . rawurlencode($name);
-            if (($item['state'] ?? '') !== 'uploaded' || $url !== $expected || !is_int($item['size'] ?? null) || $item['size'] <= 0) continue;
-        } else {
-            $url = $item['url'] ?? '';
-            // These are the exact generic-package and direct-link paths used by the release tool.
-            $allowed = [
-                'https://gitlab.kladhest.se/api/v4/projects/retrocs-org%2Fopenfp/packages/generic/openfirepower/' . $version . '/' . rawurlencode($name),
-                $repo . '/-/releases/' . rawurlencode($tag) . '/downloads/' . rawurlencode($name),
-            ];
-            if (!in_array($url, $allowed, true)) continue;
-        }
-        $assets[$name] = ['name' => $name, 'url' => $url, 'size' => $github ? $item['size'] : null];
+        $url = $item['browser_download_url'] ?? '';
+        $expected = $repo . '/releases/download/' . rawurlencode($tag) . '/' . rawurlencode($name);
+        if (($item['state'] ?? '') !== 'uploaded' || $url !== $expected || !is_int($item['size'] ?? null) || $item['size'] <= 0) continue;
+        $assets[$name] = ['name' => $name, 'url' => $url, 'size' => $item['size']];
     }
     return ['tag' => $tag, 'version' => $version, 'published_at' => $published, 'provider' => $provider,
-        'url' => $repo . ($github ? '/releases/tag/' : '/-/releases/') . rawurlencode($tag), 'assets' => $assets];
+        'url' => $repo . '/releases/tag/' . rawurlencode($tag), 'assets' => $assets];
 }
 
 function ofp_release_fetch(string $provider): array
@@ -98,6 +84,8 @@ function ofp_release_catalog(?callable $fetch = null, ?string $cachePath = null,
         $cache = json_decode((string)@file_get_contents($cachePath), true) ?: [];
         if (!is_array($cache)) $cache = [];
     }
+    // Discard cached providers that are no longer public release sources.
+    $cache = array_intersect_key($cache, ofp_release_hosts());
     $offline = $fetch === null && getenv('OFP_RELEASE_OFFLINE') === '1';
     $fetch ??= 'ofp_release_fetch';
     $releases = []; $failed = false;
@@ -187,11 +175,11 @@ function render_release_downloads(array $catalog): void
 {
     $groups = $catalog['groups']; $status = $catalog['status'];
     ?>
-    <div class="download-heading"><p class="kicker">Published releases</p><h2 id="download">Get OpenFP</h2>
-      <p>Choose a client for your platform, or host a game on Linux.</p></div>
+    <section class="game-download-section" aria-labelledby="play-game">
+    <div class="download-heading" id="download"><p class="kicker">Game clients</p><h2 id="play-game">Play a Game</h2>
+      <p>Choose a client for your platform. Play locally or join an online server.</p></div>
     <?php if ($status === 'stale'): ?><p class="notice small">A release host could not be refreshed. These are recently confirmed links; a newer release may be available.</p><?php endif; ?>
-    <?php if ($status === 'unavailable'): ?><p class="notice small">We couldn’t reach the release hosts. Please check <a href="<?= h(OFP_RELEASE_GITHUB) ?>/releases">GitHub</a> or <a href="<?= h(OFP_RELEASE_GITLAB) ?>/-/releases">GitLab</a>.</p><?php endif; ?>
-    <h3>Game clients</h3>
+    <?php if ($status === 'unavailable'): ?><p class="notice small">We couldn’t reach GitHub. Please check <a href="<?= h(OFP_RELEASE_GITHUB) ?>/releases">the releases page</a>.</p><?php endif; ?>
     <ul class="client-downloads">
       <?php foreach ([
           'macos' => ['macOS', 'Apple silicon + Intel · universal app', 'Drag the app from the DMG to Applications, or extract the ZIP.'],
@@ -206,8 +194,9 @@ function render_release_downloads(array $catalog): void
         </li>
       <?php endforeach; ?>
     </ul>
-    <section class="server-download-panel" aria-labelledby="server-downloads">
-      <div class="server-download-heading"><div><p class="kicker">Host your own battles</p><h3 id="server-downloads">Linux dedicated server</h3></div><span class="tag">Headless · up to 8 players</span></div>
+    </section>
+    <section class="server-download-panel" id="server-downloads" aria-labelledby="host-game">
+      <div class="server-download-heading"><div><p class="kicker">Linux dedicated server</p><h2 id="host-game">Host a Game</h2></div><span class="tag">Headless · up to 8 players</span></div>
       <p>The server runs the match and bots for clients on every supported platform. No desktop or SDL is required. Choose the architecture of your Linux host.</p>
       <div class="server-download-options">
         <?php foreach (['x86_64' => 'Intel / AMD · x86_64', 'aarch64' => 'ARM64 · aarch64'] as $arch => $label): ?>
@@ -215,8 +204,8 @@ function render_release_downloads(array $catalog): void
         <?php endforeach; ?>
       </div>
       <p class="note">Ubuntu 24.04 or newer. Extract the archive, copy <code>server.cfg.example</code> to <code>server.cfg</code>, review it, then run <code>./ofp_server -c server.cfg</code>.</p>
-      <a href="/build/#server">Server setup and build instructions →</a>
+      <a href="/source/#server">Server setup and build instructions →</a>
     </section>
-    <div class="release-links"><a href="<?= h(OFP_RELEASE_GITHUB) ?>/releases">All GitHub releases</a><a href="<?= h(OFP_RELEASE_GITLAB) ?>/-/releases">All GitLab releases</a><a href="/build/">Build from source</a></div>
+    <div class="release-links"><a href="<?= h(OFP_RELEASE_GITHUB) ?>/releases">All GitHub releases</a><a href="/source/">Build from source</a></div>
     <?php
 }

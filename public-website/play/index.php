@@ -6,12 +6,13 @@ page_start('Play', 'play', 'Download OpenFP and join a game.');
 ?>
 <section class="wrap prose">
   <h1>Play</h1>
-  <p class="lead">Download OpenFP, try Training, or find an online game.</p>
+  <p class="lead">Get a client to play, or run a Linux server for your own battles.</p>
+  <nav class="section-nav" aria-label="Play sections">
+    <a href="#play-game">Play a Game</a><a href="#host-game">Host a Game</a>
+    <a href="#online">Join online</a><a href="#controls">Controls</a>
+  </nav>
 
   <?php render_release_downloads($downloads); ?>
-
-  <h2 id="build">Build the game</h2>
-  <p><a href="/build/">Build from source on AmigaOS, macOS, Linux or Windows</a>.</p>
 
   <h2 id="controls">Default controls</h2>
   <table class="keys">
@@ -45,7 +46,6 @@ page_start('Play', 'play', 'Download OpenFP and join a game.');
   <p class="note">If your client is older than the server, update from the downloads above. If the server is older,
     ask the host to update it.</p>
 
-  <h2 id="server">Host a game</h2>
-  <p><a href="/build/#server">Build and run the Linux dedicated server</a>.</p>
+  <p><a href="/source/">Source code and build instructions for every platform →</a></p>
 </section>
 <?php page_end();

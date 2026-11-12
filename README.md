@@ -9,7 +9,6 @@ own vehicles, weather and battlefield features.
 
 [Website and downloads](https://openfp.retrocs.org/play/) ·
 [GitHub](https://github.com/retrocs-org/openfp) ·
-[GitLab](https://gitlab.kladhest.se/retrocs-org/openfp) ·
 [First-release features](CHANGELOG.md)
 
 ## Play

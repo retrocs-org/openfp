@@ -89,7 +89,7 @@ function ofp_daily_store(int $day, string $name, int $ticks, int $verified, stri
         $q->execute([$day]);
         if ($q->fetchColumn() === $name && $leader !== $name && $flag === null) {   /* a new leader: tell the chat */
             $s = intdiv($ticks, 50);
-            ofp_webhook('daily', sprintf('%s leads today\'s challenge: %d:%02d. %s/daily/', $name, intdiv($s, 60), $s % 60,
+            ofp_webhook('daily', sprintf('%s leads today\'s challenge: %d:%02d. %s/activity/?view=daily', $name, intdiv($s, 60), $s % 60,
                                          ofp_settings()['site']['base_url'] ?? ''));
         }
     }

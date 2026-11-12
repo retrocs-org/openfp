@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: MIT
- * OpenFirePower: dark steel, bronze rims and amber, like the game's menus. */
+ * OpenFP: dark steel, bronze rims and amber, like the game's menus. */
 :root {
   --bg: #0f0f0c; --bg2: #16160f; --panel: #1c1c16; --panel2: #23231b; --line: #34332a;
   --rim: #a87a38; --amber: #f8c440; --amber2: #e8b030; --text: #d8d2bc; --muted: #8a8572;
@@ -134,7 +134,7 @@ pre.code { background: #0b0b09; border: 1px solid var(--line); border-radius: 8p
 .prose { max-width: 900px; padding-top: 50px; }
 .prose h1 { font-size: 40px; color: var(--amber); }
 .prose h2 { margin-top: 44px; }
-.page-build h2[id] { scroll-margin-top: 110px; }
+.page-source h2[id] { scroll-margin-top: 110px; }
 .prose li { margin: 6px 0; }
 .note { color: var(--muted); font-size: 14px; }
 table.keys { border-collapse: collapse; width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
@@ -253,4 +253,27 @@ body.zoom-open { overflow: hidden; }
   .client-download-row { grid-template-columns: 1fr; gap: 8px; }
   .server-download-options { grid-template-columns: 1fr; gap: 12px; }
   .server-download-panel { padding: 22px; }
+}
+
+/* ---- section navigation ---- */
+#screenshots, #play-game, #host-game, #online, #controls { scroll-margin-top: 100px; }
+.section-nav { justify-content: flex-start; gap: 8px; padding: 10px 0 22px; margin: 0 0 18px; border-bottom: 1px solid var(--line); }
+.section-nav a { background: var(--panel); border: 1px solid var(--line); padding: 9px 16px; }
+.section-nav a:hover, .section-nav a:focus-visible { border-color: var(--amber); }
+.activity-head { padding-top: 44px; }
+.activity-head h1 { color: var(--amber); font-size: 40px; }
+.activity-head .lead { margin-bottom: 14px; }
+.page-activity section.wrap > h2:first-child { margin-top: 22px; }
+.page-activity .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 20px 0; }
+.page-activity .tabs a { border: 1px solid var(--line); border-radius: 99px; padding: 5px 12px; background: var(--panel); }
+.page-activity .tabs a.on { border-color: var(--amber); color: var(--amber); }
+.gallery-more { margin-top: 28px; }
+.gallery-more summary { cursor: pointer; color: var(--amber); font-weight: 600; padding: 12px 0; }
+.gallery-more[open] summary { margin-bottom: 18px; }
+.server-download-heading h2 { margin: 0; font-size: 28px; }
+@media (max-width: 560px) {
+  .activity-head h1 { font-size: 32px; }
+  .section-nav { gap: 6px; }
+  .section-nav a { padding: 8px 11px; }
+  .foot-links { flex-wrap: wrap; }
 }
