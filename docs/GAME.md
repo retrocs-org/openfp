@@ -307,11 +307,14 @@ macOS (Apple Silicon or Intel):
     cmake --build build
     ./build/openfirepower
 
-Linux:
+Linux (openSUSE Leap 16, the preferred platform):
 
-    sudo zypper in cmake gcc SDL2-devel        # openSUSE
-    sudo apt install cmake gcc libsdl2-dev libcurl4-openssl-dev     # Debian/Ubuntu (libcurl: https)
-    cmake -B build && cmake --build build && ./build/openfirepower
+    sudo zypper install gcc make cmake pkgconf-pkg-config python3 SDL2-devel sqlite3-devel libcurl-devel ca-certificates
+    cmake -B build -DCMAKE_BUILD_TYPE=Release
+    cmake --build build
+    ./build/openfirepower
+
+See [BUILDING.md](BUILDING.md) for server builds and packaging.
 
 Tests and a headless smoke run:
 

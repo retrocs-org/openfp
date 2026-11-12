@@ -12,11 +12,15 @@ The desktop clients and dedicated server use CMake 3.16 or newer and a C99
 compiler. The archive includes the game data, generated Amiga graphics and
 vendored libraries.
 
-## Linux client (Debian or Ubuntu)
+## Linux client (openSUSE Leap 16)
+
+openSUSE Leap 16 is the preferred Linux build and test platform for both the
+desktop client and dedicated server. Other distributions can build from source
+with equivalent development packages.
 
 ```sh
-sudo apt update
-sudo apt install python3 build-essential cmake pkg-config libsdl2-dev libsqlite3-dev libcurl4-openssl-dev
+sudo zypper refresh
+sudo zypper install gcc make cmake pkgconf-pkg-config python3 SDL2-devel sqlite3-devel libcurl-devel ca-certificates
 cmake -S . -B build-linux -DCMAKE_BUILD_TYPE=Release
 cmake --build build-linux --parallel "$(nproc)"
 ./build-linux/openfirepower
@@ -33,8 +37,10 @@ This writes `openfp-client-linux-ARCH-0.1.tar.gz` and
 `openfp-server-linux-ARCH-0.1.tar.gz`, each with a `.sha256` file.
 The client archive has `OpenFirePower/Play`; the separate server archive has
 `OpenFirePowerServer/ofp_server`, configuration examples and maps.
-For an optional local Ubuntu 24.04 DEB, add `--deb` (not a release asset).
-Build from source on other distributions.
+Build and test release archives on openSUSE Leap 16 for each architecture.
+The archives use the system libraries from their build host. Other distributions
+may need a source build. On Debian or Ubuntu, `--deb` also creates an optional
+local DEB; it is not a release asset or the preferred Linux package format.
 
 This also builds the dedicated server and tests. To run the tests on a machine
 without a display or sound device, use SDL's dummy drivers.
@@ -46,8 +52,8 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy ctest --test-dir build-linux --outpu
 ## Linux dedicated server (headless)
 
 ```sh
-sudo apt update
-sudo apt install build-essential cmake pkg-config libsqlite3-dev libcurl4-openssl-dev ca-certificates
+sudo zypper refresh
+sudo zypper install gcc make cmake pkgconf-pkg-config python3 sqlite3-devel libcurl-devel ca-certificates
 cmake -S . -B build-server -DCMAKE_BUILD_TYPE=Release -DOFP_BUILD_SDL2=OFF -DOFP_BUILD_TESTS=OFF
 cmake --build build-server --parallel "$(nproc)"
 ./build-server/ofp_server --version
@@ -60,7 +66,7 @@ file or keep your existing one when upgrading.
 
 ```sh
 cp -n server.cfg.example server.cfg
-${EDITOR:-nano} server.cfg
+${EDITOR:-vi} server.cfg
 ./build-server/ofp_server -c server.cfg --check
 ./build-server/ofp_server -c server.cfg
 ```
@@ -112,15 +118,15 @@ sh tools/package_macos.sh
 
 Cross-build the Windows client on macOS or Linux using MinGW-w64. Install the
 following dependencies for your build host. MSI packaging also needs `wixl`,
-available from Homebrew's `msitools` or the `wixl` package on Ubuntu 24.04.
-See [Ubuntu's package listing](https://packages.ubuntu.com/noble/wixl).
+available from `msitools` on openSUSE Leap 16 or Homebrew.
+On other Linux distributions, install the package providing `wixl`.
 
 ```sh
 # macOS
 brew install cmake mingw-w64 python msitools
 
-# Debian or Ubuntu
-sudo apt install build-essential cmake mingw-w64 curl python3
+# openSUSE Leap 16
+sudo zypper install gcc make cmake mingw64-cross-gcc mingw64-cross-binutils curl python3 msitools
 ```
 
 ```sh

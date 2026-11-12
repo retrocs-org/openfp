@@ -48,7 +48,7 @@ function page_start(string $title, string $page, string $description = ''): void
     $full = $title === $cfg['site_name'] ? $title : "$title · {$cfg['site_name']}";
     $nav = ['index' => ['Home', '/'],
             'servers' => ['Servers', '/server/'], 'statistics' => ['Statistics', '/statistics/'],
-            'maps' => ['Maps', '/maps/'],
+            'maps' => ['Maps', '/maps/'], 'documentation' => ['Documentation', '/documentation/'],
             'source' => ['Source', '/source/']];
     ?><!doctype html>
 <html lang="en">
@@ -62,7 +62,7 @@ function page_start(string $title, string $page, string $description = ''): void
 <meta property="og:image" content="<?= h($cfg['base_url']) ?>/assets/img/20261111-desktop-classic.png">
 <meta name="theme-color" content="#f5f2e9">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/assets/site.css?v=20261112-8">
+<link rel="stylesheet" href="/assets/site.css?v=20261112-10">
 </head>
 <body class="page-<?= h($page) ?>">
 <a class="skip-link" href="#main">Skip to content</a>
@@ -104,6 +104,7 @@ function page_end(): void
       <a href="/privacy/">Privacy</a>
       <a href="/server/">Servers</a>
       <a href="/#get">Downloads</a>
+      <a href="/documentation/">Documentation</a>
       <a href="/api/docs/">API documentation</a>
       <?php if ($cfg['repo_url']): ?><a href="<?= h($cfg['repo_url']) ?>">GitHub</a><?php endif; ?>
       <?php if ($cfg['contact']): ?><a href="<?= h($cfg['contact']) ?>">Contact</a><?php endif; ?>

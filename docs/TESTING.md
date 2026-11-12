@@ -169,9 +169,11 @@ profile focus, match reports, replay/awards buttons, editor menus and unplug/rec
 
 ## Linux and Apple TV
 
-Test the Linux packages on Ubuntu 24.04 for their target architecture, ARM64 or
-x86_64. Portable and extracted Debian clients must launch from an unrelated
-current directory. Include desktop display and controller checks on the target hardware.
+Use openSUSE Leap 16 as the preferred Linux build and test platform for both
+ARM64 and x86_64 packages. Test the desktop client and dedicated server on their
+matching target architecture. The portable client must launch from an unrelated
+current directory. Include desktop display and controller checks on the target
+hardware. Optional local DEB packages need separate Debian/Ubuntu runtime checks.
 
 Apple TV simulator checks cover the engine and controller-driven menus, keyboard,
 chat, replays and editor. Device output requires your signing team. A physical

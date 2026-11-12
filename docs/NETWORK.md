@@ -199,12 +199,14 @@ match, which gives:
     cmake -S . -B build-server -DOFP_BUILD_SDL2=OFF
     cmake --build build-server          # ofp_server and ofp_match; no SDL needed
 
-On Linux and macOS. SQLite 3 is used for the statistics, the leaderboard and
-the chat log (Debian/Ubuntu: `apt install libsqlite3-dev`; macOS has it).
+openSUSE Leap 16 is the preferred Linux server platform; the server also builds
+on macOS. SQLite 3 is used for the statistics, leaderboard and chat log. On
+openSUSE, install `sqlite3-devel`; macOS includes it. See [BUILDING.md](BUILDING.md)
+for the complete dependency and build commands.
 
 **https.** The game and the server talk to the listing over https when they're built
-with libcurl: macOS has it in its SDK, Linux needs `libcurl-devel` (openSUSE) or
-`libcurl4-openssl-dev` (Debian). cmake says `https for the listing: libcurl …`. Without it
+with libcurl: macOS has it in its SDK; openSUSE Leap 16 needs `libcurl-devel`
+and `ca-certificates`. Other distributions need equivalent packages. cmake says `https for the listing: libcurl …`. Without it
 (`-DOFP_WITH_CURL=OFF`), the desktop client and server use the built-in HTTP
 transport for listing requests. `ofp_server --check` reports the available transport.
 For a listing with a certificate from a private CA, set `OFP_CA_FILE=/path/ca.pem`.

@@ -211,7 +211,8 @@ The default matrix needs macOS and both Linux architectures. On a Mac, start wit
 python3 scripts/release.py build --targets macos,windows,amiga
 ```
 
-On matching Linux machines, use the **same committed source and target configuration**:
+Use openSUSE Leap 16 as the preferred release build and test host on both Linux
+architectures. On those machines, use the **same committed source and target configuration**:
 
 ```sh
 python3 scripts/release.py build --targets linux-x86_64

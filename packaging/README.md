@@ -2,7 +2,8 @@
 
 | Where | File | Build it |
 |---|---|---|
-| Linux ARM64 / x86_64 | portable `.tar.gz`, Ubuntu 24.04 `.deb` | `sh tools/package_linux.sh` on Linux |
+| Linux ARM64 / x86_64 | portable client and server `.tar.gz` | `sh tools/package_linux.sh` on openSUSE Leap 16 (preferred) |
+| Debian / Ubuntu (optional) | local `.deb`, not a release asset | `sh tools/package_linux.sh --deb` on a matching Debian/Ubuntu host |
 | Windows x64 | portable ZIP and MSI, including QA kit | `sh tools/package_windows.sh --msi` |
 | macOS universal | app, DMG | `sh tools/package_macos.sh` |
 | AmigaOS 16 colours | Workbench installer `.lha` | `sh tools/amiga/package_lha.sh 0.1 build-amiga-ecs` |

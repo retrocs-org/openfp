@@ -9,6 +9,7 @@ page_start('Source', 'source', 'Build OpenFP for AmigaOS, macOS, Linux and Windo
 <section class="wrap prose">
   <h1>Source</h1>
   <p class="lead">Browse the code, download a source release, or build a client and the Linux dedicated server.</p>
+  <p>For gameplay, client installation and server configuration, visit <a href="/documentation/">Documentation</a>.</p>
   <p class="tags build-links"><a class="tag" href="#amiga">AmigaOS</a> <a class="tag" href="#macos">macOS</a>
     <a class="tag" href="#linux">Linux</a> <a class="tag" href="#windows">Windows</a>
     <a class="tag" href="#tvos">Apple TV preview</a> <a class="tag" href="#server">Linux dedicated server</a></p>
@@ -46,9 +47,9 @@ cmake --build build-mac --parallel
 
   </div></details>
   <details class="build-guide" id="linux"><summary>Linux desktop</summary><div class="build-content">
-  <p>On Debian or Ubuntu, install SDL2 and the build tools.</p>
-  <pre class="code"><code>sudo apt update
-sudo apt install build-essential cmake pkg-config libsdl2-dev libcurl4-openssl-dev libsqlite3-dev
+  <p>openSUSE Leap 16 is the preferred Linux platform. Install SDL2 and the build tools.</p>
+  <pre class="code"><code>sudo zypper refresh
+sudo zypper install gcc make cmake pkgconf-pkg-config python3 SDL2-devel sqlite3-devel libcurl-devel ca-certificates
 cmake -S . -B build-linux -DCMAKE_BUILD_TYPE=Release
 cmake --build build-linux --parallel "$(nproc)"
 ./build-linux/openfirepower</code></pre>
@@ -60,11 +61,11 @@ cmake --build build-linux --parallel "$(nproc)"
   </div></details>
   <details class="build-guide" id="windows"><summary>Windows x64</summary><div class="build-content">
   <p>Cross-build on macOS or Linux with MinGW-w64, CMake, curl and Python 3. On macOS use
-    <code>brew install cmake mingw-w64 python</code>. On Debian or Ubuntu use
-    <code>sudo apt install build-essential cmake mingw-w64 curl python3</code>.</p>
+    <code>brew install cmake mingw-w64 python</code>. On openSUSE Leap 16 use
+    <code>sudo zypper install gcc make cmake mingw64-cross-gcc mingw64-cross-binutils curl python3</code>.</p>
   <pre class="code"><code>sh tools/package_windows.sh</code></pre>
   <p>Find the portable ZIP under <code>~/Development/packages/OpenFirePower/Windows/</code>. Add <code>--msi</code> to make an installer after installing
-    Homebrew’s <code>msitools</code> or Debian or Ubuntu’s <code>wixl</code> package.</p>
+    <code>msitools</code> on openSUSE Leap 16 or Homebrew; other Linux distributions need a package providing <code>wixl</code>.</p>
 
   <p>The Windows package includes <code>windows-qa.ps1</code> and <code>WINDOWS-TESTS.md</code>
     for automated checks and a short fullscreen, controller and installer checklist.</p>
@@ -81,17 +82,13 @@ sh tools/package_tvos.sh device</code></pre>
 
   </div></details>
   <details class="build-guide" id="server"><summary>Linux dedicated server</summary><div class="build-content">
-  <p>Build the server on Debian or Ubuntu without SDL. It runs the bots and manages the match for connected clients.</p>
-  <pre class="code"><code>sudo apt update
-sudo apt install build-essential cmake pkg-config libsqlite3-dev libcurl4-openssl-dev ca-certificates
+  <p>Build the server on openSUSE Leap 16, the preferred Linux platform, without SDL. It runs the bots and manages the match for connected clients.</p>
+  <pre class="code"><code>sudo zypper refresh
+sudo zypper install gcc make cmake pkgconf-pkg-config python3 sqlite3-devel libcurl-devel ca-certificates
 cmake -S . -B build-server -DCMAKE_BUILD_TYPE=Release -DOFP_BUILD_SDL2=OFF -DOFP_BUILD_TESTS=OFF
 cmake --build build-server --parallel "$(nproc)"
-cp -n server.cfg.example server.cfg
-nano server.cfg
-./build-server/ofp_server -c server.cfg --check
-./build-server/ofp_server -c server.cfg</code></pre>
-  <p>For private games, set <code>public</code>, <code>share_matches</code> and <code>share_replays</code> to <code>no</code> before starting.
-    Players connect by address on UDP port <b>29870</b>. Server and clients must use the same protocol and rules. When upgrading a systemd installation, replace the executable named by its <code>ExecStart</code>, then restart the service; rebuilding in a source folder alone does not update the running server. The source build guide also covers running the server as a systemd service.</p>
+./build-server/ofp_server --version</code></pre>
+  <p>After compilation, follow <a href="/documentation/server/">Server setup</a> for configuration, network access, running as a service and updates.</p>
   </div></details>
 </section>
 <?php page_end();

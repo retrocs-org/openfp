@@ -360,7 +360,7 @@ if(OFP_BUILD_SERVER)
       target_link_libraries(ofp_server PRIVATE SQLite::SQLite3)
     else()
       message(WARNING "SQLite 3 not found: ofp_server is built without statistics and leaderboards "
-                      "(Debian/Ubuntu: apt install libsqlite3-dev; macOS has it built in)")
+                      "(openSUSE Leap 16: zypper install sqlite3-devel; macOS has it built in)")
     endif()
   endif()
   install(TARGETS ofp_server ofp_match RUNTIME DESTINATION bin)

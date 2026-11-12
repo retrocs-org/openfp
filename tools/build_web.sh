@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: MIT
 # The game's core as WebAssembly, for the web site's replay viewer
 # (public-website/assets/ofp.wasm). Needs clang with the wasm32 target, wasm-ld and
-# wasi-libc: on Debian/Ubuntu  apt install clang lld wasi-libc ; on openSUSE
-# zypper install clang lld wasi-libc ; on macOS  brew install llvm wasi-libc.
+# wasi-libc: on openSUSE Leap 16  zypper install clang lld wasi-libc ;
+# on macOS  brew install llvm wasi-libc ; on Debian/Ubuntu  apt install clang lld wasi-libc.
 set -e
 cd "$(dirname "$0")/.."
 SYSROOT=${WASI_SYSROOT:-/usr}

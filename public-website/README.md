@@ -3,7 +3,7 @@
 This folder is the whole web side of OpenFP:
 
 * **The web site:** `/` (About, screenshots and downloads), `/server/` (the live server list), `/statistics/`,
-  `/source/` and `/maps/`. Screenshots are on the home page.
+  `/documentation/`, `/source/` and `/maps/`. Documentation covers gameplay, clients, map editing, server setup and troubleshooting; Source covers compilation. Screenshots are on the home page.
 * **The listing API:** `/api/`. Dedicated servers announce themselves to it, and
   the game's FIND SERVERS reads from it.
 
@@ -11,7 +11,7 @@ It is self-contained and is itself the document root. The listing keeps its
 data in **MariaDB**; the site stores nothing of its own.
 
 ```
-index.php  server/  statistics/  source/  maps/  assets/
+index.php  server/  statistics/  documentation/  source/  maps/  assets/
 api/                                 the listing API
 inc/                                 the shared code; migrations.php, migrate.php   (never served)
 config.inc.example.php               the settings: copy to config.inc.php   (never served)

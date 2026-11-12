@@ -41,19 +41,19 @@ See the [game guide](docs/GAME.md) for Amiga controls and all game options.
 Full instructions for **every client**, packaging and the **Linux dedicated
 server** are in [docs/BUILDING.md](docs/BUILDING.md).
 
-Linux desktop, on Debian or Ubuntu:
+Linux desktop, on the preferred Linux platform, **openSUSE Leap 16**:
 
 ```sh
-sudo apt install build-essential cmake pkg-config libsdl2-dev libsqlite3-dev libcurl4-openssl-dev
+sudo zypper install gcc make cmake pkgconf-pkg-config python3 SDL2-devel sqlite3-devel libcurl-devel ca-certificates
 cmake -S . -B build-linux -DCMAKE_BUILD_TYPE=Release
 cmake --build build-linux --parallel
 ./build-linux/openfirepower
 ```
 
-Linux dedicated server, without SDL or a desktop:
+Linux dedicated server on openSUSE Leap 16, without SDL or a desktop:
 
 ```sh
-sudo apt install build-essential cmake pkg-config libsqlite3-dev libcurl4-openssl-dev ca-certificates
+sudo zypper install gcc make cmake pkgconf-pkg-config python3 sqlite3-devel libcurl-devel ca-certificates
 cmake -S . -B build-server -DCMAKE_BUILD_TYPE=Release -DOFP_BUILD_SDL2=OFF -DOFP_BUILD_TESTS=OFF
 cmake --build build-server --parallel
 cp -n server.cfg.example server.cfg
@@ -66,6 +66,7 @@ configuration, ports and service installation.
 
 ## Documentation and releases
 
+- [Online documentation](https://openfp.retrocs.org/documentation/) for gameplay, clients, maps and server setup.
 - [Game guide](docs/GAME.md), [map editor and format](docs/MAPS.md), [artwork](docs/THEMES.md).
 - [Client and server builds](docs/BUILDING.md), [Amiga port](docs/PORTING.md).
 - [Push source and publish releases](docs/RELEASING.md).
