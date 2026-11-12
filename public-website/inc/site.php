@@ -62,7 +62,7 @@ function page_start(string $title, string $page, string $description = ''): void
 <meta property="og:image" content="<?= h($cfg['base_url']) ?>/assets/img/20261111-desktop-classic.png">
 <meta name="theme-color" content="#f5f2e9">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/assets/site.css?v=20261112-11">
+<link rel="stylesheet" href="/assets/site.css?v=20261112-14">
 </head>
 <body class="page-<?= h($page) ?>">
 <a class="skip-link" href="#main">Skip to content</a>

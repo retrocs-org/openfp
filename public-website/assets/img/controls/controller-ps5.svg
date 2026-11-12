@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 720" role="img" aria-labelledby="title desc">
+<!-- SPDX-License-Identifier: MIT -->
+<title id="title">PlayStation 5 DualSense controller</title>
+<desc id="desc">A white DualSense controller with rounded grips, a black centre, a broad touchpad, symmetrical analogue sticks and grey PlayStation symbol buttons. Six numbered callouts outside the controller show the default OpenFP controls.</desc>
+<style>text{font-family:Arial,Helvetica,sans-serif}.shell{stroke:#363d3a;stroke-width:2.5;stroke-linejoin:round}.wire{fill:none;stroke:#ad381d;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}</style>
+<defs>
+ <linearGradient id="shell" x1="0" y1="0" x2=".3" y2="1"><stop stop-color="#fff"/><stop offset=".6" stop-color="#edf0ed"/><stop offset="1" stop-color="#d5dbd7"/></linearGradient>
+ <linearGradient id="centre" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#363b3e"/><stop offset="1" stop-color="#202528"/></linearGradient>
+ <linearGradient id="pad" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#fafbfc"/><stop offset="1" stop-color="#dfe3e9"/></linearGradient>
+ <radialGradient id="stick"><stop offset=".65" stop-color="#32393c"/><stop offset="1" stop-color="#1f2629"/></radialGradient>
+</defs>
+<rect width="1000" height="720" rx="12" fill="#eeede3"/>
+<path d="M40 680H960" stroke="#d3d4c7"/>
+<text x="40" y="703" fill="#60675d" font-size="14" letter-spacing="2">OPENFP / DEFAULT CONTROLS</text>
+<!-- Rear triggers sit behind the rounded shoulder housings. -->
+<path d="M279 219 L279 190 Q318 169 365 184 L371 211Z" fill="#252b2e" class="shell"/>
+<path d="M721 219 L721 190 Q682 169 635 184 L629 211Z" fill="#252b2e" class="shell"/>
+<path d="M287 191 Q326 178 360 188 M713 191 Q674 178 640 188" fill="none" stroke="#626b6c" stroke-width="3"/>
+<text x="325" y="204" fill="#fcfaf4" font-size="17" font-weight="600" text-anchor="middle">L2</text>
+<text x="675" y="204" fill="#fcfaf4" font-size="17" font-weight="600" text-anchor="middle">R2</text>
+<!-- Continuous, gently curved outer silhouette with full rounded grips. -->
+<path d="M294 218 C334 201 377 198 414 204 Q500 194 586 204 C623 198 666 201 706 218 C747 237 767 294 781 358 C796 426 804 504 785 554 C778 575 764 589 748 585 C723 579 708 551 690 515 L650 439 Q637 416 612 425 H388 Q363 416 350 439 L310 515 C292 551 277 579 252 585 C236 589 222 575 215 554 C196 504 204 426 219 358 C233 294 253 237 294 218Z" fill="url(#shell)" class="shell"/>
+<path d="M285 221 Q328 207 366 211 M715 221 Q672 207 634 211" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+<!-- Black inset follows the inside of the white grips and stays flat below the sticks. -->
+<path d="M380 214 Q500 199 620 214 L638 312 C647 341 669 373 687 410 L756 584 L730 591 L655 444 Q641 424 616 429 Q500 437 384 429 Q359 424 345 444 L270 591 L244 584 L313 410 C331 373 353 341 362 312Z" fill="url(#centre)" class="shell"/>
+<path d="M378 220 C370 251 371 298 358 328 C340 361 319 398 301 442 L247 573 M622 220 C630 251 629 298 642 328 C660 361 681 398 699 442 L753 573" fill="none" stroke="#6b777c" stroke-opacity=".45" stroke-width="2"/>
+<!-- Broad rounded touchpad and the characteristic blue light strips. -->
+<path d="M378 220 Q500 207 622 220 L612 298 Q608 335 582 341 H418 Q392 335 388 298Z" fill="#151c22" stroke="#151c22" stroke-width="8"/>
+<path d="M379 224 L390 296 Q394 328 416 334 M621 224 L610 296 Q606 328 584 334" fill="none" stroke="#427bcc" stroke-width="6" stroke-linecap="round"/>
+<path d="M390 216 Q500 207 610 216 Q620 217 617 232 L607 297 Q603 326 581 329 H419 Q397 326 393 297 L383 232 Q380 217 390 216Z" fill="url(#pad)" stroke="#bcc5cc" stroke-width="2"/>
+<!-- Create and Options buttons. -->
+<g transform="rotate(-12 361 253)"><rect x="354" y="238" width="14" height="29" rx="7" fill="#ecf0ee" stroke="#7e8a8f" stroke-width="1.8"/></g>
+<path d="M354 229l-3 -6 M361 227v-7 M368 229l3 -6" stroke="#889299" stroke-width="2"/>
+<g transform="rotate(12 639 253)"><rect x="632" y="238" width="14" height="29" rx="7" fill="#ecf0ee" stroke="#7e8a8f" stroke-width="1.8"/></g>
+<path d="M633 221h12 M633 226h12 M633 231h12" stroke="#889299" stroke-width="2"/>
+
+<g transform="translate(315 319) rotate(0)"><path d="M-17 -47 Q0 -52 17 -47 Q21 -44 20 -37 L17 -23 Q16 -20 12 -16 L3 -9 Q0 -7 -3 -9 L-12 -16 Q-16 -20 -17 -23 L-20 -37 Q-21 -44 -17 -47Z" fill="url(#pad)" stroke="#7e8a8f" stroke-width="2.2"/><path d="M-6 -31L0 -38 6 -31Z" fill="#929ca6"/></g>
+<g transform="translate(315 319) rotate(90)"><path d="M-17 -47 Q0 -52 17 -47 Q21 -44 20 -37 L17 -23 Q16 -20 12 -16 L3 -9 Q0 -7 -3 -9 L-12 -16 Q-16 -20 -17 -23 L-20 -37 Q-21 -44 -17 -47Z" fill="url(#pad)" stroke="#7e8a8f" stroke-width="2.2"/><path d="M-6 -31L0 -38 6 -31Z" fill="#929ca6"/></g>
+<g transform="translate(315 319) rotate(180)"><path d="M-17 -47 Q0 -52 17 -47 Q21 -44 20 -37 L17 -23 Q16 -20 12 -16 L3 -9 Q0 -7 -3 -9 L-12 -16 Q-16 -20 -17 -23 L-20 -37 Q-21 -44 -17 -47Z" fill="url(#pad)" stroke="#7e8a8f" stroke-width="2.2"/><path d="M-6 -31L0 -38 6 -31Z" fill="#929ca6"/></g>
+<g transform="translate(315 319) rotate(270)"><path d="M-17 -47 Q0 -52 17 -47 Q21 -44 20 -37 L17 -23 Q16 -20 12 -16 L3 -9 Q0 -7 -3 -9 L-12 -16 Q-16 -20 -17 -23 L-20 -37 Q-21 -44 -17 -47Z" fill="url(#pad)" stroke="#7e8a8f" stroke-width="2.2"/><path d="M-6 -31L0 -38 6 -31Z" fill="#929ca6"/></g>
+<circle cx="685" cy="276" r="21" fill="#eff1f2" stroke="#8b959e" stroke-width="2.2"/>
+<circle cx="685" cy="276" r="17" fill="none" stroke="#d0d6db" stroke-width="1"/>
+<circle cx="642" cy="319" r="21" fill="#eff1f2" stroke="#8b959e" stroke-width="2.2"/>
+<circle cx="642" cy="319" r="17" fill="none" stroke="#d0d6db" stroke-width="1"/>
+<circle cx="728" cy="319" r="21" fill="#eff1f2" stroke="#8b959e" stroke-width="2.2"/>
+<circle cx="728" cy="319" r="17" fill="none" stroke="#d0d6db" stroke-width="1"/>
+<circle cx="685" cy="362" r="21" fill="#eff1f2" stroke="#8b959e" stroke-width="2.2"/>
+<circle cx="685" cy="362" r="17" fill="none" stroke="#d0d6db" stroke-width="1"/>
+<path d="M685 263L673 286H697Z M632 309H652V329H632Z M674 351L696 373 M696 351L674 373" fill="none" stroke="#8b95a2" stroke-width="2.4" stroke-linejoin="round"/>
+<circle cx="728" cy="319" r="12" fill="none" stroke="#8b95a2" stroke-width="2.4"/>
+<circle cx="405" cy="405" r="41" fill="#171e21" stroke="#566066" stroke-width="2.5"/>
+<circle cx="405" cy="405" r="36" fill="url(#stick)" stroke="#11181c" stroke-width="2"/>
+<circle cx="405" cy="405" r="29" fill="#343c40" stroke="#485359" stroke-width="1.8"/>
+<path d="M386 390 Q405 377 424 390" fill="none" stroke="#67737a" stroke-opacity=".55" stroke-width="2"/>
+<circle cx="595" cy="405" r="41" fill="#171e21" stroke="#566066" stroke-width="2.5"/>
+<circle cx="595" cy="405" r="36" fill="url(#stick)" stroke="#11181c" stroke-width="2"/>
+<circle cx="595" cy="405" r="29" fill="#343c40" stroke="#485359" stroke-width="1.8"/>
+<path d="M576 390 Q595 377 614 390" fill="none" stroke="#67737a" stroke-opacity=".55" stroke-width="2"/>
+<circle cx="478" cy="350" r="3" fill="#10191d"/>
+<circle cx="489" cy="350" r="3" fill="#10191d"/>
+<circle cx="500" cy="350" r="3" fill="#10191d"/>
+<circle cx="511" cy="350" r="3" fill="#10191d"/>
+<circle cx="522" cy="350" r="3" fill="#10191d"/>
+<circle cx="484" cy="360" r="3" fill="#10191d"/>
+<circle cx="495" cy="360" r="3" fill="#10191d"/>
+<circle cx="505" cy="360" r="3" fill="#10191d"/>
+<circle cx="516" cy="360" r="3" fill="#10191d"/>
+<path d="M495 378 L505 381 Q514 384 513 390 Q512 394 506 393 L503 391 V407 L495 404Z M493 394 L483 399 Q479 401 485 404 L493 407 M506 399L515 401Q521 403 515 405L506 408" fill="none" stroke="#10181d" stroke-width="2.2" stroke-linejoin="round"/>
+<rect x="487" y="420" width="26" height="7" rx="3.5" fill="#8d979b" stroke="#131c21" stroke-width="2"/>
+<path d="M310 110 V145 L325 178" class="wire"/>
+<circle cx="310" cy="110" r="16" fill="#ad381d"/>
+<text x="310" y="116" fill="#fcfaf4" font-size="18" font-weight="600" text-anchor="middle">1</text><text x="310" y="75" fill="#282e2b" font-size="21" font-weight="600" text-anchor="middle">Backward</text>
+<path d="M690 110 V145 L675 178" class="wire"/>
+<circle cx="690" cy="110" r="16" fill="#ad381d"/>
+<text x="690" y="116" fill="#fcfaf4" font-size="18" font-weight="600" text-anchor="middle">2</text><text x="690" y="75" fill="#282e2b" font-size="21" font-weight="600" text-anchor="middle">Forward</text>
+<path d="M190 390 H334 L364 405" class="wire"/>
+<circle cx="190" cy="390" r="16" fill="#ad381d"/>
+<text x="190" y="396" fill="#fcfaf4" font-size="18" font-weight="600" text-anchor="middle">3</text><text x="117" y="350" fill="#282e2b" font-size="21" font-weight="600" text-anchor="middle">Turn / navigate</text>
+<path d="M500 110 V148 L642 298" class="wire"/>
+<circle cx="500" cy="110" r="16" fill="#ad381d"/>
+<text x="500" y="116" fill="#fcfaf4" font-size="18" font-weight="600" text-anchor="middle">5</text><text x="500" y="75" fill="#282e2b" font-size="21" font-weight="600" text-anchor="middle">Lay mine</text>
+<path d="M819 350 H780 L750 319" class="wire"/>
+<circle cx="819" cy="350" r="16" fill="#ad381d"/>
+<text x="819" y="356" fill="#fcfaf4" font-size="18" font-weight="600" text-anchor="middle">6</text><text x="883" y="320" fill="#282e2b" font-size="21" font-weight="600" text-anchor="middle">Menu back</text>
+<path d="M819 520 H768 L696 383" class="wire"/>
+<circle cx="819" cy="520" r="16" fill="#ad381d"/>
+<text x="819" y="526" fill="#fcfaf4" font-size="18" font-weight="600" text-anchor="middle">4</text><text x="883" y="485" fill="#282e2b" font-size="21" font-weight="600" text-anchor="middle">Fire / select</text>
+</svg>

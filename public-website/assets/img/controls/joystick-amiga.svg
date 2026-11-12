@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 720" role="img" aria-labelledby="title desc">
+<!-- SPDX-License-Identifier: MIT -->
+<title id="title">Competition Pro style Amiga joystick</title><desc id="desc">A rounded black Competition Pro style base with a raised square housing, cylindrical collar, red ball-top stick, two large red fire buttons and two small red triangular buttons.</desc>
+<style>text{font-family:Arial,Helvetica,sans-serif}.body{stroke:#282e2b;stroke-width:3;stroke-linejoin:round}.wire{fill:none;stroke:#ad381d;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}</style>
+<defs><linearGradient id="white" x2="0.2" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#d7d9d4"/></linearGradient><linearGradient id="black" x2="0.4" y2="1"><stop stop-color="#525655"/><stop offset=".55" stop-color="#292d2c"/><stop offset="1" stop-color="#151a17"/></linearGradient><linearGradient id="red" x2=".5" y2="1"><stop stop-color="#eb5849"/><stop offset=".6" stop-color="#c32923"/><stop offset="1" stop-color="#841e1d"/></linearGradient></defs>
+<rect width="1000" height="720" rx="12" fill="#eeede3"/>
+<path d="M40 680H960" stroke="#d3d4c7"/><text x="40" y="703" fill="#60675d" font-size="14" letter-spacing="2">OPENFP / DEFAULT CONTROLS</text>
+<path d="M299 486 C231 517 177 574 79 613" fill="none" class="" stroke="#282e2b" stroke-width="12"/>
+<path d="M285 355 L449 292 Q474 282 496 294 L710 392 Q752 410 757 448 L759 490 Q757 512 736 526 L530 613 Q501 627 471 616 L269 537 Q237 525 235 491 L231 437 Q230 385 285 355Z" fill="#242a27" class="body" />
+<path d="M285 348 L449 286 Q474 277 496 288 L710 385 Q751 405 753 438 Q749 460 720 475 L526 557 Q500 571 471 558 L265 476 Q236 464 233 438 Q230 380 285 348Z" fill="url(#black)" class="body" />
+<path d="M253 438 Q264 461 288 470 L474 544 Q500 556 525 545 L721 462" fill="none" class="" stroke="#747c73" stroke-width="3"/>
+<path d="M258 488 L469 572 Q500 586 532 573 L738 488" fill="none" class="" stroke="#101813" stroke-width="6"/>
+<path d="M375 350 L514 297 Q527 293 540 300 L668 363 L668 388 L525 448 L373 379Z" fill="#111813" class="body" />
+<path d="M375 345 L514 291 Q527 286 540 293 L668 357 Q674 365 664 370 L525 424 Q515 429 506 424 L375 365 Q367 355 375 345Z" fill="#404643" class="body" />
+<path d="M383 346 L515 296 Q528 291 541 298 L656 355" fill="none" class="" stroke="#92998e" stroke-width="2.5"/>
+<path d="M390 337 L415 321 Q424 317 424 329 L423 360 Q422 369 413 365 L390 351 Q381 344 390 337Z" fill="#cb3029" class="body" />
+<path d="M507 403 L542 390 Q550 389 553 397 L540 413 Q535 420 525 417 L509 413 Q499 410 507 403Z" fill="#cb3029" class="body" />
+<ellipse cx="520" cy="354" rx="66" ry="29" fill="#0e1510" stroke="#282e2b" stroke-width="3"/>
+<path d="M455 294 L455 348 Q520 391 585 348 L585 294Z" fill="url(#black)" class="body" />
+<ellipse cx="520" cy="294" rx="65" ry="29" fill="#4a504c" stroke="#151d17" stroke-width="3"/>
+<ellipse cx="520" cy="289" rx="47" ry="22" fill="#131c15" stroke="#6c776c" stroke-width="2"/>
+<path d="M482 263 L482 286 Q520 307 558 286 L558 263Z" fill="#111a13" class="body" />
+<ellipse cx="520" cy="263" rx="38" ry="17" fill="#373e37" stroke="#101812" stroke-width="3"/>
+<path d="M503 265 L503 132 L537 132 L537 265 Q520 277 503 265Z" fill="url(#red)" class="body" />
+<path d="M507 146V252" fill="none" class="" stroke="#f78869" stroke-width="4"/>
+<circle cx="520" cy="111" r="55" fill="url(#red)" class="body" />
+<path d="M482 99 Q487 65 523 69" fill="none" class="" stroke="#f99176" stroke-width="8" stroke-linecap="round"/>
+<ellipse cx="326" cy="439" rx="54" ry="31" fill="#131a15"/>
+<path d="M273 419 V436 Q326 470 379 436 V419Z" fill="#767f74" class="body" />
+<ellipse cx="326" cy="420" rx="54" ry="30" fill="url(#red)" stroke="#161e17" stroke-width="3"/>
+<ellipse cx="326" cy="415" rx="45" ry="23" fill="#d43a30" stroke="#e7634c" stroke-width="2"/>
+<ellipse cx="500" cy="519" rx="54" ry="31" fill="#131a15"/>
+<path d="M447 499 V516 Q500 550 553 516 V499Z" fill="#767f74" class="body" />
+<ellipse cx="500" cy="500" rx="54" ry="30" fill="url(#red)" stroke="#161e17" stroke-width="3"/>
+<ellipse cx="500" cy="495" rx="45" ry="23" fill="#d43a30" stroke="#e7634c" stroke-width="2"/>
+<path d="M258 150 H438 L466 116" fill="none" class="wire" />
+<circle cx="258" cy="150" r="16" fill="#ad381d" class="" />
+<text x="258" y="156" fill="#fcfaf4" font-size="18" font-weight="600" text-anchor="middle">1</text>
+<text x="190" y="117" fill="#282e2b" font-size="21" font-weight="600" text-anchor="middle">Move / navigate</text>
+<path d="M815 535 H713 L551 504" fill="none" class="wire" />
+<circle cx="815" cy="535" r="16" fill="#ad381d" class="" />
+<text x="815" y="541" fill="#fcfaf4" font-size="18" font-weight="600" text-anchor="middle">2</text>
+<text x="884" y="502" fill="#282e2b" font-size="21" font-weight="600" text-anchor="middle">Fire / select</text>
+</svg>

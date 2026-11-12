@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 530" role="img" aria-labelledby="title desc">
+<!-- SPDX-License-Identifier: MIT -->
+<title id="title">Desktop keyboard layouts</title><desc id="desc">Player 1 uses the arrows. Player 2 uses W A S D. The action keys and menu keys are shown in separate groups.</desc>
+<style>text{font-family:Arial,Helvetica,sans-serif}.body{stroke:#26332c;stroke-width:4;stroke-linejoin:round}.wire{fill:none;stroke:#ad381d;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.key{fill:#fcfaf4;stroke:#26332c;stroke-width:2}.letter{fill:#26332c;font-size:25px;font-weight:700;text-anchor:middle}</style>
+<rect width="900" height="530" rx="12" fill="#eeede3"/>
+<path d="M40 490H860" stroke="#d3d4c7"/><text x="40" y="512" fill="#60675d" font-size="14" letter-spacing="2">OPENFP / DEFAULT CONTROLS</text>
+<rect x="38" y="40" width="398" height="350" rx="14" fill="#e1e4d8" class="key"/>
+<rect x="464" y="40" width="398" height="350" rx="14" fill="#e1e4d8" class="key"/>
+<text x="65" y="78" fill="#26332c" font-size="20" font-weight="600" text-anchor="start">PLAYER 1</text>
+<text x="490" y="78" fill="#26332c" font-size="20" font-weight="600" text-anchor="start">PLAYER 2</text>
+<rect x="205" y="104" width="60" height="57" rx="7" fill="#fcfaf4" class="key"/>
+<text x="235.0" y="140" fill="#26332c" font-size="23" font-weight="600" text-anchor="middle">↑</text>
+<rect x="137" y="169" width="60" height="57" rx="7" fill="#fcfaf4" class="key"/>
+<text x="167.0" y="205" fill="#26332c" font-size="23" font-weight="600" text-anchor="middle">←</text>
+<rect x="205" y="169" width="60" height="57" rx="7" fill="#fcfaf4" class="key"/>
+<text x="235.0" y="205" fill="#26332c" font-size="23" font-weight="600" text-anchor="middle">↓</text>
+<rect x="273" y="169" width="60" height="57" rx="7" fill="#fcfaf4" class="key"/>
+<text x="303.0" y="205" fill="#26332c" font-size="23" font-weight="600" text-anchor="middle">→</text>
+<rect x="634" y="104" width="60" height="57" rx="7" fill="#fcfaf4" class="key"/>
+<text x="664.0" y="140" fill="#26332c" font-size="23" font-weight="600" text-anchor="middle">W</text>
+<rect x="566" y="169" width="60" height="57" rx="7" fill="#fcfaf4" class="key"/>
+<text x="596.0" y="205" fill="#26332c" font-size="23" font-weight="600" text-anchor="middle">A</text>
+<rect x="634" y="169" width="60" height="57" rx="7" fill="#fcfaf4" class="key"/>
+<text x="664.0" y="205" fill="#26332c" font-size="23" font-weight="600" text-anchor="middle">S</text>
+<rect x="702" y="169" width="60" height="57" rx="7" fill="#fcfaf4" class="key"/>
+<text x="732.0" y="205" fill="#26332c" font-size="23" font-weight="600" text-anchor="middle">D</text>
+<rect x="97" y="264" width="105" height="57" rx="7" fill="#e7ad7b" class="key"/>
+<text x="149.5" y="300" fill="#26332c" font-size="23" font-weight="600" text-anchor="middle">.</text>
+<rect x="256" y="264" width="105" height="57" rx="7" fill="#e7ad7b" class="key"/>
+<text x="308.5" y="300" fill="#26332c" font-size="23" font-weight="600" text-anchor="middle">,</text>
+<rect x="495" y="264" width="165" height="57" rx="7" fill="#e7ad7b" class="key"/>
+<text x="577.5" y="300" fill="#26332c" font-size="17" font-weight="600" text-anchor="middle">Space</text>
+<rect x="690" y="264" width="145" height="57" rx="7" fill="#e7ad7b" class="key"/>
+<text x="762.5" y="300" fill="#26332c" font-size="17" font-weight="600" text-anchor="middle">L Shift</text>
+<text x="145" y="355" fill="#26332c" font-size="15" font-weight="600" text-anchor="middle">FIRE / SELECT</text>
+<text x="310" y="355" fill="#26332c" font-size="15" font-weight="600" text-anchor="middle">MINE / BACK</text>
+<text x="578" y="355" fill="#26332c" font-size="15" font-weight="600" text-anchor="middle">FIRE</text>
+<text x="742" y="355" fill="#26332c" font-size="15" font-weight="600" text-anchor="middle">MINE</text>
+<rect x="179" y="411" width="125" height="57" rx="7" fill="#fcfaf4" class="key"/>
+<text x="241.5" y="447" fill="#26332c" font-size="17" font-weight="600" text-anchor="middle">Enter</text>
+<text x="317" y="447" fill="#26332c" font-size="19" font-weight="600" text-anchor="start">Select</text>
+<rect x="492" y="411" width="95" height="57" rx="7" fill="#fcfaf4" class="key"/>
+<text x="539.5" y="447" fill="#26332c" font-size="23" font-weight="600" text-anchor="middle">Esc</text>
+<text x="603" y="447" fill="#26332c" font-size="19" font-weight="600" text-anchor="start">Back / pause</text>
+</svg>

@@ -49,7 +49,7 @@ try {
     $none = ofp_release_catalog($empty, $folder . '/empty.json', $now);
     check_release($none['status'] === 'empty' && $none['groups'] === [], 'No releases before first upload');
     ob_start(); render_release_downloads($none); $html = ob_get_clean();
-    check_release(substr_count($html, 'Not released yet.') === 7, 'Each client/server has explicit empty state');
+    check_release(substr_count($html, 'Not released yet.') === 6, 'Each platform/server architecture has an explicit empty state');
     check_release(strpos($html, '/assets/releases/') === false, 'Local packages never become published downloads');
     $missing = ofp_release_catalog(static fn($host) => ['status' => 404], $folder . '/404.json', $now);
     check_release($missing['status'] === 'empty', 'Missing public repository/release means not released');
@@ -84,7 +84,15 @@ try {
     $clientOnly = ofp_release_catalog(static fn($host) => ['status' => 200, 'body' => json_encode([fixture_release($host, '0.1', ['openfp-client-linux-x86_64-0.1.tar.gz'])])], $folder . '/client-only.json', $now);
     check_release(isset($clientOnly['groups']['linux-x86_64']) && !isset($clientOnly['groups']['server-x86_64']), 'Client archive never masquerades as server');
     ob_start(); render_release_downloads($catalog); $rendered = ob_get_clean();
-    check_release(substr_count($rendered, 'class="client-download-row"') === 5 && substr_count($rendered, 'class="server-download-panel"') === 1, 'Compact clients and one separate server panel');
+    check_release(substr_count($rendered, 'class="client-download-row"') === 4 && substr_count($rendered, 'class="server-download-panel"') === 1, 'One entry per client platform and one separate server panel');
+    check_release(substr_count($rendered, 'class="client-download-variant"') === 2, 'Label both Linux architectures when one has been released');
+    $linux = ofp_release_catalog(static fn($host) => ['status' => 200, 'body' => json_encode([fixture_release($host, '0.1',
+        ['openfp-client-linux-x86_64-0.1.tar.gz', 'openfp-client-linux-aarch64-0.1.tar.gz'])])], $folder . '/linux.json', $now);
+    ob_start(); render_release_downloads($linux); $linuxHtml = ob_get_clean();
+    preg_match_all('/<li class="client-download-row">(.*?)<\/li>/s', $linuxHtml, $platforms);
+    $linuxRows = array_values(array_filter($platforms[1], static fn($row) => str_contains($row, '<h4>Linux</h4>')));
+    check_release(count($linuxRows) === 1 && str_contains($linuxRows[0], 'openfp-client-linux-x86_64-0.1.tar.gz')
+        && str_contains($linuxRows[0], 'openfp-client-linux-aarch64-0.1.tar.gz'), 'Both Linux download links appear in the same platform entry');
     check_release(strpos($rendered, 'download-card') === false, 'No large per-client cards');
     check_release(strpos($rendered, 'All GitHub releases') !== false && substr_count($rendered, 'All ') === 1, 'Only the public releases page is advertised');
     $mismatch = fixture_release('github', '0.2', ['openfp-client-macos-universal-0.1.dmg']);

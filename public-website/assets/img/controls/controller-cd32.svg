@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 720" role="img" aria-labelledby="title desc">
+<!-- SPDX-License-Identifier: MIT -->
+<title id="title">Amiga CD32 gamepad</title><desc id="desc">A curved black CD32 controller, circular direction pad and four coloured buttons. Movement, fire, mine, radar and pause callouts all sit outside the device.</desc>
+<style>text{font-family:Arial,Helvetica,sans-serif}.body{stroke:#282e2b;stroke-width:3;stroke-linejoin:round}.wire{fill:none;stroke:#ad381d;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}</style>
+<defs><linearGradient id="white" x2="0.2" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#d7d9d4"/></linearGradient><linearGradient id="black" x2="0.4" y2="1"><stop stop-color="#525655"/><stop offset=".55" stop-color="#292d2c"/><stop offset="1" stop-color="#151a17"/></linearGradient><linearGradient id="red" x2=".5" y2="1"><stop stop-color="#eb5849"/><stop offset=".6" stop-color="#c32923"/><stop offset="1" stop-color="#841e1d"/></linearGradient></defs>
+<rect width="1000" height="720" rx="12" fill="#eeede3"/>
+<path d="M40 680H960" stroke="#d3d4c7"/><text x="40" y="703" fill="#60675d" font-size="14" letter-spacing="2">OPENFP / DEFAULT CONTROLS</text>
+<path d="M500 349 C496 230 475 200 482 169" fill="none" class="" stroke="#282e2b" stroke-width="8"/>
+<rect x="267" y="228" width="85" height="35" rx="12" fill="#303735" class="body"/>
+<rect x="648" y="228" width="85" height="35" rx="12" fill="#303735" class="body"/>
+<path d="M240 265 Q285 244 340 251 L381 337 Q500 361 619 337 L660 251 Q715 244 760 265 Q785 302 790 375 L778 462 Q770 495 730 504 Q500 571 270 504 Q230 495 222 462 L210 375 Q215 302 240 265Z" fill="url(#black)" class="body" />
+<path d="M381 360 Q500 384 619 360 L632 433 Q500 474 368 433Z" fill="#454b48" class="body" />
+<circle cx="308" cy="364" r="65" fill="#141a16" class="body" />
+<circle cx="308" cy="322" r="4" fill="#58625a" class="body" />
+<circle cx="266" cy="364" r="4" fill="#58625a" class="body" />
+<circle cx="350" cy="364" r="4" fill="#58625a" class="body" />
+<circle cx="308" cy="406" r="4" fill="#58625a" class="body" />
+<path d="M300 343l8 -7 8 7" fill="none" class="" stroke="#879486" stroke-width="2"/>
+<path d="M300 385l8 7 8 -7" fill="none" class="" stroke="#879486" stroke-width="2"/>
+<path d="M287 356l-7 8 7 8" fill="none" class="" stroke="#879486" stroke-width="2"/>
+<path d="M329 356l7 8 -7 8" fill="none" class="" stroke="#879486" stroke-width="2"/>
+<circle cx="658" cy="305" r="24" fill="#49b59a" class="body" />
+<circle cx="708" cy="279" r="24" fill="#e8bf38" class="body" />
+<circle cx="735" cy="337" r="24" fill="#3079b7" class="body" />
+<circle cx="681" cy="363" r="28" fill="#d33334" class="body" />
+<path d="M642 300Q655 283 672 298 M692 274Q708 257 724 272 M720 332Q733 315 750 330 M663 356Q681 340 700 354" fill="none" class="" stroke="#ffffff" stroke-opacity=".22" stroke-width="4"/>
+<rect x="590" y="463" width="57" height="15" rx="6" fill="#141a16" class="body"/>
+<path d="M190 365 H243" fill="none" class="wire" />
+<circle cx="190" cy="365" r="16" fill="#ad381d" class="" />
+<text x="190" y="371" fill="#fcfaf4" font-size="18" font-weight="600" text-anchor="middle">1</text>
+<text x="112" y="330" fill="#282e2b" font-size="21" font-weight="600" text-anchor="middle">Move / navigate</text>
+<path d="M820 335 H760" fill="none" class="wire" />
+<circle cx="820" cy="335" r="16" fill="#ad381d" class="" />
+<text x="820" y="341" fill="#fcfaf4" font-size="18" font-weight="600" text-anchor="middle">3</text>
+<text x="884" y="305" fill="#282e2b" font-size="21" font-weight="600" text-anchor="middle">Mine / back</text>
+<path d="M820 495 H766 L695 389" fill="none" class="wire" />
+<circle cx="820" cy="495" r="16" fill="#ad381d" class="" />
+<text x="820" y="501" fill="#fcfaf4" font-size="18" font-weight="600" text-anchor="middle">2</text>
+<text x="884" y="465" fill="#282e2b" font-size="21" font-weight="600" text-anchor="middle">Fire / select</text>
+<path d="M760 132 V188 L715 256" fill="none" class="wire" />
+<circle cx="760" cy="132" r="16" fill="#ad381d" class="" />
+<text x="760" y="138" fill="#fcfaf4" font-size="18" font-weight="600" text-anchor="middle">4</text>
+<text x="760" y="97" fill="#282e2b" font-size="21" font-weight="600" text-anchor="middle">Radar</text>
+<path d="M500 624 V578 L611 478" fill="none" class="wire" />
+<circle cx="500" cy="624" r="16" fill="#ad381d" class="" />
+<text x="500" y="630" fill="#fcfaf4" font-size="18" font-weight="600" text-anchor="middle">5</text>
+<text x="500" y="660" fill="#282e2b" font-size="21" font-weight="600" text-anchor="middle">Pause / back</text>
+</svg>

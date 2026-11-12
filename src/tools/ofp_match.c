@@ -13,6 +13,7 @@
  * It is the heart of the match server (see docs/NETWORK.md), and a test bench:
  * a replay that stops matching its checksums means the simulation changed.
  */
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -345,15 +346,164 @@ static int balance(int argc, char **argv)
     return 0;
 }
 
+/* Observation stays in this tool: no counters or timing enter the simulation. */
+typedef struct {
+    uint32_t alive, home, enemy, repair, patrol, attack, carrying, pickups, shots, low_progress;
+    int first_enemy;
+} EvalTeam;
+
+static unsigned eval_number(const char *s, unsigned low, unsigned high)
+{
+    char *end;
+    unsigned long n;
+    if (!s[0] || s[0] == '-') return 0;
+    errno = 0;
+    n = strtoul(s, &end, 10);
+    return !errno && !*end && n >= low && n <= high ? (unsigned)n : 0;
+}
+
+static int eval_inside(const Base *b, const Tank *t)
+{
+    int x = fx_to_int(t->x) >> TILE_SHIFT, y = fx_to_int(t->y) >> TILE_SHIFT;
+    return x >= b->x0 && x <= b->x1 && y >= b->y0 && y <= b->y1;
+}
+
+static int evaluate(int argc, char **argv)
+{
+    MatchSetup ms = {0};
+    EvalTeam stats[2] = {{0}, {0}};
+    Replay replay;
+    const char *map_path = NULL, *out = NULL, *profile = "server", *goal = "flag";
+    char *map;
+    unsigned seed = 1, side = 4, minutes = 20;
+    int level = AI_NORMAL, gi = -1, i, k, half, room[2] = {4,4};
+    fx sample_x[MAX_TANKS] = {0}, sample_y[MAX_TANKS] = {0};
+    unsigned sample_live[MAX_TANKS] = {0};
+    for (i = 2; i < argc; i++) {
+        const char *opt = argv[i], *value;
+        if (i + 1 == argc) { fprintf(stderr, "missing value for %s\n", opt); return 2; }
+        value = argv[++i];
+        if (!strcmp(opt, "--map")) map_path = value;
+        else if (!strcmp(opt, "--out")) out = value;
+        else if (!strcmp(opt, "--profile")) profile = value;
+        else if (!strcmp(opt, "--goal")) goal = value;
+        else if (!strcmp(opt, "--seed")) seed = eval_number(value, 1, UINT32_MAX);
+        else if (!strcmp(opt, "--side")) side = eval_number(value, 1, MATCH_PLAYERS / 2);
+        else if (!strcmp(opt, "--minutes")) minutes = eval_number(value, 1, 30);
+        else if (!strcmp(opt, "--level")) {
+            level = !strcmp(value,"easy") ? AI_EASY : !strcmp(value,"normal") ? AI_NORMAL : !strcmp(value,"hard") ? AI_HARD : AI_OFF;
+        } else { fprintf(stderr, "unknown evaluation option %s\n", opt); return 2; }
+    }
+    for (i = 0; i < (int)(sizeof bal_goals / sizeof bal_goals[0]); i++)
+        if (!strcmp(goal, bal_goals[i].name)) gi = i;
+    if (!map_path || !seed || !side || !minutes || !level || gi < 0 ||
+        (strcmp(profile,"server") && strcmp(profile,"local"))) {
+        fprintf(stderr, "evaluate requires --map FILE; valid --seed, --side 1..4, --minutes 1..30, --level easy|normal|hard, --profile server|local and --goal\n");
+        return 2;
+    }
+    map = read_text(map_path);
+    if (!map) { fprintf(stderr,"cannot read %s\n",map_path); return 1; }
+    ms.seed = seed; ms.players = 2; ms.camp_garages = 4; ms.versus = 1;
+    ms.ai_level = (uint8_t)level; ms.extras = bal_goals[gi].extras;
+    ms.bot_commands = 1; ms.time_limit = (uint16_t)(minutes * 60);
+    if (match_room_sides(&ms,map,room) < 2 || room[0] < 1 || room[1] < 1) {
+        fprintf(stderr,"map has no room for opposing teams\n"); free(map); return 1;
+    }
+    half = (int)side;
+    if (half > room[0]) half = room[0];
+    if (half > room[1]) half = room[1];
+    ms.players = (uint8_t)(2 * half);
+    for (i = 0; i < ms.players; i++) {
+        k = i % half;
+        ms.team[i] = (uint8_t)(i < half ? TEAM_PLAYER : TEAM_ENEMY);
+        ms.cls[i] = (uint8_t)((k + seed % TANK_CLASS_COUNT) % TANK_CLASS_COUNT);
+        ms.bot[i] = (uint8_t)level;
+        /* Local all-bot CTF sides leave one opening defender; Classic never gets these flags. */
+        if (!strcmp(profile,"local") && gi == 0 && (half == 1 || k > 0))
+            ms.bot[i] |= MATCH_BOT_RAIDER | MATCH_BOT_SIEGE;
+    }
+    if (match_start(&g,&ms,map)) { fprintf(stderr,"bad map\n"); free(map); return 1; }
+    if (g.biome == BIOME_CLASSIC || !g.enhanced_rules) {
+        for (i = 0; i < ms.players; i++) {
+            ms.bot[i] = (uint8_t)level;
+            ms.cls[i] = (uint8_t)(((i % half) + seed % 3) % 3);
+        }
+        if (match_start(&g,&ms,map)) { free(map); return 1; }
+    }
+    if ((g.extras & ~(EXTRA_PICKUPS)) != bal_goals[gi].extras) {
+        fprintf(stderr,"map overrides the requested game mode; choose its authored mode\n");
+        free(map); return 2;
+    }
+    stats[0].first_enemy = stats[1].first_enemy = -1;
+    if (out) replay_begin(&replay,&ms,map,g.num_tanks);
+    while (g.winner < 0 && !g.time_up && g.tick < minutes * 60u * TICK_RATE) {
+        InputBits input[MAX_TANKS] = {0};
+        uint8_t flag[MAX_TANKS], reload[MAX_TANKS];
+        for (i = 0; i < g.num_tanks; i++) {
+            const Tank *t = &g.tanks[i];
+            flag[i] = t->has_flag; reload[i] = t->reload;
+            if (g.tick % TICK_RATE == 0) { sample_x[i] = t->x; sample_y[i] = t->y; sample_live[i] = !t->out && !t->respawn && t->active; }
+        }
+        game_tick_server(&g,input);
+        if (out) replay_tick(&replay,input,&g);
+        for (i = 0; i < g.num_tanks; i++) {
+            const Tank *t = &g.tanks[i];
+            EvalTeam *s = &stats[t->team & 1];
+            int mode = g.ai[i].mode;
+            if (!flag[i] && t->has_flag) s->pickups++;
+            if (!reload[i] && t->reload) s->shots++;
+            if (!t->active || t->out || t->respawn) { sample_live[i] = 0; continue; }
+            s->alive++;
+            if (!g.map.arena && eval_inside(&g.bases[t->team & 1],t)) s->home++;
+            if (!g.map.arena && eval_inside(&g.bases[1 - (t->team & 1)],t)) {
+                s->enemy++;
+                if (s->first_enemy < 0) s->first_enemy = (int)g.tick;
+            }
+            s->repair += mode == AIM_REPAIR;
+            s->patrol += mode == AIM_PATROL;
+            s->attack += mode == AIM_RAID || mode == AIM_FETCH || mode == AIM_HUNT || mode == AIM_POINT || mode == AIM_HILL;
+            s->carrying += t->has_flag != 0;
+            if (g.tick % TICK_RATE == 0 && sample_live[i] &&
+                (mode == AIM_RAID || mode == AIM_FETCH || mode == AIM_HOME || mode == AIM_HUNT || mode == AIM_CHASE || mode == AIM_RECOVER) &&
+                llabs((long long)t->x - sample_x[i]) < FX(2) && llabs((long long)t->y - sample_y[i]) < FX(2)) s->low_progress++;
+        }
+    }
+    if (out) {
+        int saved = replay.stopped ? -1 : replay_save(&replay,out);
+        replay_free(&replay);
+        if (saved) { fprintf(stderr,"cannot save complete replay\n"); free(map); return 1; }
+    }
+    printf("{\"schema\":1,\"seed\":%u,\"goal\":\"%s\",\"profile\":\"%s\",\"world\":\"%s\",\"side\":%d,\"ticks\":%u,\"tick_rate\":%d,\"winner\":%d,\"time_up\":%s,\"checksum\":\"%08x\",\"teams\":[",
+           seed,goal,profile,biome_name((Biome)g.biome),half,(unsigned)g.tick,TICK_RATE,(int)g.winner,g.time_up ? "true" : "false",(unsigned)game_checksum(&g));
+    for (k = 0; k < 2; k++) {
+        EvalTeam *s = &stats[k];
+        unsigned score = 0, kills = 0, lost = 0, saved = 0, objective = 0;
+        for (i = 0; i < g.num_tanks; i++) if ((g.tanks[i].team & 1) == k) {
+            score += g.tanks[i].score; kills += g.tanks[i].tank_kills; lost += g.tanks[i].lost; saved += g.tanks[i].saved;
+        }
+        if (g.extras & EXTRA_CONQUEST) objective = g.cp_score[k];
+        else if (g.extras & EXTRA_HARDPOINT) objective = g.hp_score[k];
+        else if (g.extras & EXTRA_KILLCONF) objective = g.kc_score[k];
+        else if (g.extras & EXTRA_WARLORD) objective = g.jug_score[k];
+        else if (g.extras & EXTRA_HILL) objective = g.hill[k] / TICK_RATE;
+        printf("%s{\"alive_ticks\":%u,\"home_ticks\":%u,\"enemy_base_ticks\":%u,\"repair_ticks\":%u,\"patrol_ticks\":%u,\"attack_ticks\":%u,\"carrying_ticks\":%u,\"flag_pickups\":%u,\"shots\":%u,\"low_progress_seconds\":%u,\"first_enemy_base_tick\":%d,\"score\":%u,\"tank_kills\":%u,\"deaths\":%u,\"rescued\":%u,\"objective_score\":%u}",
+               k ? "," : "",s->alive,s->home,s->enemy,s->repair,s->patrol,s->attack,s->carrying,s->pickups,s->shots,s->low_progress,s->first_enemy,score,kills,lost,saved,objective);
+    }
+    puts("]}"); free(map); return 0;
+}
+
 int main(int argc, char **argv)
 {
     if (argc >= 2 && !strcmp(argv[1], "bots")) return bots(argc, argv);
     if (argc >= 2 && !strcmp(argv[1], "balance")) return balance(argc, argv);
+    if (argc >= 2 && !strcmp(argv[1], "evaluate")) return evaluate(argc, argv);
     if (argc == 3 && !strcmp(argv[1], "check-map")) return check_map(argv[2]);
     if (argc >= 3 && !strcmp(argv[1], "verify")) return verify(argv[2]);
     if (argc >= 4 && !strcmp(argv[1], "dump")) return dump_cmd(argc, argv);
     if (argc >= 4 && !strcmp(argv[1], "diff")) return diff_cmd(argv[2], argv[3]);
     fprintf(stderr, "usage: ofp_match bots [--seed N] [--world NAME] [--map FILE] [--extras N] [--storm] [--ticks N] [--out FILE]\n"
+                    "       ofp_match evaluate --map FILE [--goal flag|conquest|hill|annihilation|deathmatch|warlord|killconfirmed|hardpoint]\n"
+                    "                          [--profile server|local] [--level easy|normal|hard] [--side 1..4] [--seed N] [--minutes 1..30] [--out REPLAY]\n"
                     "       ofp_match verify FILE.ofprep\n"
                     "       ofp_match check-map FILE.ofpmap\n"
                     "       ofp_match balance [--goal flag|conquest|hill|annihilation|deathmatch|warlord] [--level easy|normal|hard]\n"

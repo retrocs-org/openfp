@@ -82,6 +82,82 @@ whose `modes=` leaves the mode out is skipped. The last line says whether the di
 more than chance gives (more than about twice the square root of the decided matches).
 A match takes a few seconds on one core; a hundred, ten minutes or so, divided by `--jobs`.
 
+
+## Bot strategy tournament
+
+`tools/ai_tournament.py` plays private, accelerated bot-versus-bot matches and
+saves statistics for strategy work. It does not connect to a public server,
+change the bots or train them automatically. Python 3.9+ is required.
+
+Build the headless match tool on Linux or macOS:
+
+```sh
+cmake -S . -B build-ai -DCMAKE_BUILD_TYPE=Release -DOFP_BUILD_SDL2=OFF -DOFP_BUILD_TESTS=OFF
+cmake --build build-ai --target ofp_match --parallel
+```
+
+Start with a short check, then run for up to eight hours:
+
+```sh
+python3 tools/ai_tournament.py --engine build-ai/ofp_match --matches 12 --minutes 6
+python3 tools/ai_tournament.py --engine build-ai/ofp_match --hours 8 --jobs 2
+```
+
+On this development Mac, the existing evaluation build can be used directly:
+
+```sh
+caffeinate -i python3 tools/ai_tournament.py \
+  --engine $HOME/Development/builds/OpenFirePower/AI/Tools/ofp_match \
+  --hours 8 --jobs 2
+```
+
+By default, results go into a new dated directory under
+`~/Development/builds/OpenFirePower/AI/`. Use `--out PATH` to choose another
+new directory. Leave the command running, or use a terminal session manager
+such as `tmux` on Linux. Ctrl-C stops the run and keeps completed results.
+
+The runner covers the currently supported bundled maps and their allowed
+modes, normal and hard bots, and two bot presets: `server` matches the dedicated
+server's level-only setup; `local` uses the opening raider/siege roles of an
+all-bot local Capture the Flag game. Classic retains the original classes and
+does not gain the enhanced raider/siege preset. Team sizes are clamped to the
+map's capacity, with at most eight tanks total. Each new round uses a fixed seed.
+
+Use repeatable `--map FILE` arguments to narrow the run, `--levels normal`,
+`--profiles server`, `--side 1` for two tanks, or `--minutes 20` for the simulated
+match limit. The match limit can never exceed 30 minutes. `--timeout` limits
+wall time per match; `--replays N` controls how many initial matches are saved.
+Matches run faster than real time; `--hours` is a wall-clock budget.
+
+The output directory contains:
+
+- `report.md`: finishes, time limits, base/attack/repair time, flag pickups and
+  matches with little movement to inspect.
+- `matches.csv`: one row per team per match, suitable for a spreadsheet.
+- `results.jsonl`: full per-match statistics and exact reproduction commands.
+- `manifest.json`, `engine/` and `maps/`: a snapshot of the executable and maps,
+  their hashes, source revision and run settings.
+- `replays/`: the first N recorded matches, with resolved authoritative bot inputs.
+
+Attack time measures AI intent, not every moment spent fighting. Low progress
+is a routing investigation aid: turning or combat may also explain it. Base
+time can be legitimate defence or repair. These measures overlap. Time-limit
+points wins are reported separately from finishes before the limit. A self-play
+win rate alone cannot show that a strategy improved; compare the same maps,
+seeds, team sizes, presets and match lengths before and after a change.
+
+For a single reproducible run and its playback check:
+
+```sh
+build-ai/ofp_match evaluate --map data/maps/ctf-duel-at-dawn.ofpmap \
+  --profile server --level normal --side 1 --seed 7919 --minutes 20 --out bots.ofprep
+build-ai/ofp_match verify bots.ofprep
+OFP_MATCH="$PWD/build-ai/ofp_match" python3 tests/test_ai_tournament.py
+```
+
+The integration checks cover deterministic statistics, Classic restrictions,
+replay checksums, input bounds, parallel reporting, timeouts and budget shutdown.
+
 ## The same on every compiler
 
 The game's rules must give the same result whatever compiles them: gcc (Linux, Windows), clang (macOS,

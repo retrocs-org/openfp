@@ -122,6 +122,9 @@ summary::-webkit-details-marker { display:none; }
 .client-download-row h4 { margin:0 0 4px; font-size:18px; }
 .download-architecture { font:11px/1.5 var(--mono); color:var(--muted); margin:0; }
 .client-download-actions .release-pending { text-align:right; }
+.client-download-variant + .client-download-variant { margin-top:20px; }
+.client-download-variant h5 { margin:0 0 8px; font:11px/1.5 var(--mono); color:var(--text); }
+.client-download-variant .release-pending { text-align:left; }
 .release-pending { font-size:12px; color:var(--muted); font-weight:500; margin:0; }
 .release-meta { font-size:11px; color:var(--muted); margin:7px 0 0; }
 .download-options { display:flex; flex-wrap:wrap; gap:8px 14px; }
@@ -359,4 +362,28 @@ body.zoom-open { overflow:hidden; }
   html { scroll-padding-top:180px; }
   .documentation-grid { grid-template-columns:1fr; }
   .documentation-card { padding:20px; }
+}
+
+/* Illustrated default control guides. */
+.control-jump { display:flex; flex-wrap:wrap; gap:8px 22px; padding:18px 0; border-block:1px solid var(--line); font-size:14px; }
+.control-heading { margin-top:36px; scroll-margin-top:150px; }
+.control-grid,.control-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:22px; }
+.control-card { margin:20px 0; min-width:0; overflow:hidden; border:1px solid var(--line); background:var(--panel); border-radius:10px; }
+.control-grid .control-card { margin:0; }
+.control-card > a { display:block; background:#eeede3; }
+.control-card img { width:100%; height:auto; image-rendering:auto; }
+.control-card figcaption { padding:22px; }
+.control-card h4 { font-size:19px; margin:0 0 16px; }
+.control-bindings { margin:0; font-size:14px; }
+.control-bindings > div { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:12px; align-items:baseline; padding:8px 0; border-bottom:1px solid var(--line); }
+.control-bindings dt { font-weight:600; color:var(--text); }
+.control-bindings dd { margin:0; color:var(--muted); }
+.control-bindings.numbered dt { padding-left:27px; position:relative; }
+.control-bindings dt span { position:absolute; left:0; top:2px; width:19px; height:19px; border-radius:50%; background:var(--amber); color:var(--panel); font:700 11px/19px var(--sans); text-align:center; }
+.control-note { font-size:13px; color:var(--muted); margin:18px 0 0; }
+.control-grid + .control-note { margin-bottom:28px; }
+.control-card kbd { font:600 12px var(--mono); padding:1px 4px; background:var(--bg2); border:1px solid var(--line); border-radius:3px; }
+@media (max-width:700px) {
+ .control-grid,.control-columns { grid-template-columns:1fr; }
+ .control-card figcaption { padding:20px; }
 }

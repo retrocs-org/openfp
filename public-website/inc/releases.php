@@ -184,8 +184,7 @@ function render_release_downloads(array $catalog): void
           <?php foreach ([
               'macos' => ['macOS', 'Apple silicon + Intel', 'Apple silicon or Intel Mac.', 'To be confirmed.', 'macOS 11 or newer.'],
               'windows' => ['Windows', 'Intel / AMD · x86_64', '64-bit Intel or AMD processor.', 'To be confirmed.', '64-bit Windows. Minimum OS version is still being verified.'],
-              'linux-x86_64' => ['Linux', 'Intel / AMD · x86_64', '64-bit Intel or AMD processor.', 'To be confirmed.', 'openSUSE Leap 16 (preferred); SDL2 and libcurl.'],
-              'linux-aarch64' => ['Linux', 'ARM64', 'ARM64 processor.', 'To be confirmed.', 'openSUSE Leap 16 (preferred); SDL2 and libcurl.'],
+              'linux' => ['Linux', 'Intel / AMD · x86_64 + ARM64', '64-bit Intel, AMD or ARM processor.', 'To be confirmed.', 'openSUSE Leap 16 (preferred); SDL2 and libcurl.'],
               'amiga' => ['AmigaOS', 'm68k · ECS', '68040 or 68060, ECS graphics, 2 MB Chip RAM and 8 MB Fast RAM.', '16 MB Fast RAM.', 'AmigaOS 3.0 or newer. A compatible TCP/IP stack is needed for online play.'],
           ] as $key => [$title, $architecture, $minimum, $recommended, $software]): ?>
             <li class="client-download-row">
@@ -197,10 +196,16 @@ function render_release_downloads(array $catalog): void
                   <?php if ($key !== 'amiga'): ?><p class="requirements-detail">Memory and graphics requirements are still being measured.</p><?php endif; ?>
                   <h5>Software requirements</h5>
                   <p><?= h($software) ?></p>
-                  <?php if (str_starts_with($key, 'linux-')): ?><p class="requirements-detail">Other distributions can build from <a href="/source/">source</a>.</p><?php endif; ?>
+                  <?php if ($key === 'linux'): ?><p class="requirements-detail">Other distributions can build from <a href="/source/">source</a>.</p><?php endif; ?>
                 </div>
               </div>
-              <div class="client-download-actions"><?php render_release_actions($groups[$key] ?? null, $status); ?></div>
+              <div class="client-download-actions">
+                <?php if ($key === 'linux' && (isset($groups['linux-x86_64']) || isset($groups['linux-aarch64']))): ?>
+                  <?php foreach (['x86_64' => 'Intel / AMD · x86_64', 'aarch64' => 'ARM64'] as $arch => $label): ?>
+                    <div class="client-download-variant"><h5><?= h($label) ?></h5><?php render_release_actions($groups['linux-' . $arch] ?? null, $status); ?></div>
+                  <?php endforeach; ?>
+                <?php else: render_release_actions($groups[$key] ?? null, $status); endif; ?>
+              </div>
             </li>
           <?php endforeach; ?>
         </ul>
