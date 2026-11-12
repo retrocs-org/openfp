@@ -182,18 +182,19 @@ function render_release_downloads(array $catalog): void
         <div class="download-heading" id="download"><h3 id="play-game">Play a game</h3><span class="small muted">Game clients</span></div>
         <ul class="client-downloads">
           <?php foreach ([
-              'macos' => ['macOS', 'Apple silicon + Intel'],
-              'windows' => ['Windows', 'Intel / AMD · x86_64'],
-              'linux-x86_64' => ['Linux', 'Intel / AMD · x86_64'],
-              'linux-aarch64' => ['Linux', 'ARM64'],
-              'amiga' => ['AmigaOS', 'm68k · 16 colours'],
-          ] as $key => [$title, $architecture]): ?>
+              'macos' => ['macOS', 'Apple silicon + Intel', 'macOS 11 or newer.'],
+              'windows' => ['Windows', 'Intel / AMD · x86_64', '64-bit Windows. Minimum OS version is still being verified.'],
+              'linux-x86_64' => ['Linux', 'Intel / AMD · x86_64', 'Ubuntu 24.04 or newer; SDL2 and libcurl.'],
+              'linux-aarch64' => ['Linux', 'ARM64', 'Ubuntu 24.04 or newer; SDL2 and libcurl.'],
+              'amiga' => ['AmigaOS', 'm68k · ECS', 'AmigaOS 3.0+ · 68040/68060 · 2 MB Chip + 8 MB Fast RAM (16 MB Fast recommended).'],
+          ] as $key => [$title, $architecture, $requirements]): ?>
             <li class="client-download-row">
-              <div><h4><?= h($title) ?></h4><p class="download-architecture"><?= h($architecture) ?></p></div>
+              <div><h4><?= h($title) ?></h4><p class="download-architecture"><?= h($architecture) ?></p><p class="download-requirements"><span>Minimum requirements</span> <?= h($requirements) ?></p></div>
               <div class="client-download-actions"><?php render_release_actions($groups[$key] ?? null, $status); ?></div>
             </li>
           <?php endforeach; ?>
         </ul>
+        <p class="note requirements-note">Desktop memory and graphics requirements are still being measured. Linux packages target Ubuntu; other distributions can build from <a href="/source/">source</a>.</p>
       </section>
       <section class="server-download-panel" id="server-downloads" aria-labelledby="host-game">
         <div class="server-download-heading"><p class="eyebrow">Your server. Your battlefield.</p><h3 id="host-game">Host a game.</h3><p>Linux dedicated server</p></div>
@@ -202,6 +203,7 @@ function render_release_downloads(array $catalog): void
             <div class="server-download-row"><h4><?= h($label) ?></h4><?php render_release_actions($groups['server-' . $arch] ?? null, $status); ?></div>
           <?php endforeach; ?>
         </div>
+        <p class="download-requirements"><span>Requirements</span> Ubuntu 24.04 or newer on the matching architecture; SQLite3 and libcurl.</p>
         <a class="text-link" href="/source/#server">Server setup <span aria-hidden="true">↗</span></a>
       </section>
     </div>

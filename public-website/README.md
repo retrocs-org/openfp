@@ -559,7 +559,7 @@ The answers a server can get, and what they mean:
 
 | Request | Answer |
 |---|---|
-| `GET /api/` | JSON: every server with its numbers and last 24 hours, plus totals |
+| `GET /api/?action=list` | JSON: every server with its numbers and last 24 hours, plus totals |
 | `GET /api/?format=text` | one tab-separated line a server, which is what the game reads |
 | `GET /api/?action=stats` | the totals only |
 | `POST /api/` with `action=announce` | a dedicated server announcing itself |
@@ -570,7 +570,9 @@ The answers a server can get, and what they mean:
 | `GET /api/?action=leaders` | the best-rated players across the servers (`&server=HOST:PORT` for one) |
 | `GET /api/?action=version` | the newest release, `VERSION<tab>URL` (or `&format=json`), for the games' update notice |
 
-The fields are described at the top of `api/index.php`.
+The complete endpoint, field and response reference is at `/api/docs/`. Browser visits to
+the bare `/api/` URL show that guide; explicit actions and format queries keep
+the machine API responses. Clients with no HTML Accept header retain the default JSON list.
 
 
 ## Upgrading
@@ -602,13 +604,14 @@ The Ladders menu item only appears when there's at least one.
 Run `python3 tools/build_map_gallery.py` from the project root after changing the
 bundled maps, and deploy the refreshed `assets/bundled-maps.json` with the site.
 The catalog uses `data/maps/` and `data/maps/classic/` and excludes private disk imports.
-Shared maps show a preview, the world, author, and downloads. Uploads are checked (an `.ofpmap` the game can read,
+Both bundled and shared maps can be filtered by world and compatible game mode.
+Shared maps show a preview, the world, compatible modes, author, and downloads. Uploads are checked (an `.ofpmap` the game can read,
 up to 200,000 bytes), the same map twice is kept once, and one address may share ten a day.
 For uploads, install the current `ofp_match` on the web host and set its absolute path
 as `site.ofp_match` in `config.inc.php`. The PHP worker must be able to run it with
 `exec` so it can check that a match starts before the map is published.
 Servers can play them: `maps = gallery:NAME` in `server.cfg`. To take one down, set
-`admin_token` in `config.inc.php` and open `/api/?action=map_hide&id=N&token=...`.
+`admin_token` in `config.inc.php` and sign in to `/admin/`; moderation uses checked forms and a session.
 
 ## The daily challenge
 
@@ -722,7 +725,8 @@ files. The full deployment instructions above describe database migrations.
 
 The site uses a shared paper-and-ink layout with orange accents, a gameplay-led
 home page and responsive navigation. The home page introduces OpenFP and the original game's history, followed by
-screenshots and an expandable game-mode list, before **Get the game**, with a compact client list and a separate Linux server panel. Setup instructions and keyboard mappings are
+screenshots and an open game-mode list, before **Get the game**, with a compact client list, per-platform requirements and a separate Linux server panel.
+The hero labels the game unreleased until a stable client release is discovered. Setup instructions and keyboard mappings are
 omitted from the home page. `/statistics/` groups Leaderboard, Daily challenge and
 Matches into bookmarkable tabs; configured ladders also appear there. Mode, date,
 server and pagination filters stay in each tab's URL. `/source/` contains the source

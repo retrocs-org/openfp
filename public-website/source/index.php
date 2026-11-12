@@ -20,7 +20,7 @@ page_start('Source', 'source', 'Build OpenFP for AmigaOS, macOS, Linux and Windo
   <p>Unpack the source and open a terminal in the folder containing <code>CMakeLists.txt</code>.
     The included <code>docs/BUILDING.md</code> has the full build and packaging instructions. The public repository is <a href="https://github.com/retrocs-org/openfp">retrocs-org/openfp on GitHub</a>.</p>
 
-  <details class="build-guide" id="amiga"><summary>AmigaOS · 16 colours</summary><div class="build-content">
+  <details class="build-guide" id="amiga"><summary>AmigaOS · ECS</summary><div class="build-content">
   <p>Use the <code>m68k-amigaos-gcc</code> cross-compiler with libnix and the Amiga headers. Put its <code>bin</code>
     folder on your path. The game requires AmigaOS 3.x, a 68040 or 68060, 2 MB Chip RAM and at least 8 MB Fast RAM; 16 MB Fast RAM is recommended. OCS, ECS and AGA all use the same four-plane, 16-colour renderer.
     <a href="https://franke.ms/amiga/amiga-gcc.wiki">Amiga GCC toolchain and setup</a></p>

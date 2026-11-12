@@ -62,7 +62,7 @@ function page_start(string $title, string $page, string $description = ''): void
 <meta property="og:image" content="<?= h($cfg['base_url']) ?>/assets/img/20261111-desktop-classic.png">
 <meta name="theme-color" content="#f5f2e9">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/assets/site.css?v=20261112-6">
+<link rel="stylesheet" href="/assets/site.css?v=20261112-8">
 </head>
 <body class="page-<?= h($page) ?>">
 <a class="skip-link" href="#main">Skip to content</a>
@@ -100,17 +100,17 @@ function page_end(): void
       <small>MIT licensed. An independent tribute, made from scratch.</small>
     </div>
     <div class="foot-links">
-      <a href="/credits/">Soundtrack credits</a>
+      <a href="/credits/">Third Party Credits</a>
       <a href="/privacy/">Privacy</a>
       <a href="/server/">Servers</a>
       <a href="/#get">Downloads</a>
-      <a href="/api/">API</a>
+      <a href="/api/docs/">API documentation</a>
       <?php if ($cfg['repo_url']): ?><a href="<?= h($cfg['repo_url']) ?>">GitHub</a><?php endif; ?>
       <?php if ($cfg['contact']): ?><a href="<?= h($cfg['contact']) ?>">Contact</a><?php endif; ?>
     </div>
   </div>
 </footer>
-<script src="/assets/site.js?v=20261112-6" defer></script>
+<script src="/assets/site.js?v=20261112-7" defer></script>
 </body>
 </html>
 <?php

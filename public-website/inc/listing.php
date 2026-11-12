@@ -3,6 +3,8 @@
 // The OpenFP server listing: the database, the UDP check, the list.
 // Used by the API (api/index.php) and by the web site's server page.
 
+require_once __DIR__ . '/map-catalog.php';
+
 function ofp_settings(): array
 {
     static $cfg = null;
@@ -532,14 +534,43 @@ function ofp_privacy_tidy(): void
 
 function ofp_map_details(string $header): array
 {
-    $details = ['name' => '', 'author' => '', 'description' => '', 'contact' => '', 'biome' => '', 'time' => ''];
-    $limits = ['name' => 40, 'author' => 40, 'description' => 160, 'contact' => 80, 'biome' => 16, 'time' => 7];
+    $details = ['name' => '', 'author' => '', 'description' => '', 'contact' => '', 'biome' => '', 'time' => '', 'mode' => '', 'modes' => '', 'arena' => ''];
+    $limits = ['name' => 40, 'author' => 40, 'description' => 160, 'contact' => 80, 'biome' => 16, 'time' => 7, 'mode' => 16, 'modes' => 160, 'arena' => 3];
     foreach (explode("\n", str_replace("\r", '', $header)) as $line) {
         if ($line === 'tiles') break;
         [$key, $value] = array_pad(explode('=', $line, 2), 2, '');
         if (isset($limits[$key])) $details[$key] = ofp_clean($value, $limits[$key]);
     }
     return $details;
+}
+
+// Filter before limiting the results, so an older matching map is not lost behind newer maps.
+function ofp_gallery_maps(string $world = '', string $mode = '', int $limit = 200, ?PDO $db = null): array
+{
+    $limit = max(1, min(300, $limit));
+    $db ??= ofp_db();
+    $rows = [];
+    for ($offset = 0; count($rows) < $limit; $offset += 300) {
+        $q = $db->prepare("SELECT id, name, author, world, time, size, uploaded, downloads,
+            SUBSTRING_INDEX(text, CONCAT(CHAR(10), 'tiles', CHAR(10)), 1) AS map_header
+            FROM gallery WHERE hidden = 0" . ($world !== '' ? ' AND world = ?' : '')
+            . ' ORDER BY uploaded DESC, id DESC LIMIT 300 OFFSET ' . $offset);
+        $q->execute($world !== '' ? [$world] : []);
+        $batch = $q->fetchAll();
+        foreach ($batch as $m) {
+            $details = ofp_map_details($m['map_header']);
+            $m['modes'] = ofp_map_modes($details, $m['world']);
+            if ($mode !== '' && !in_array($mode, $m['modes'], true)) continue;
+            if ($m['author'] && $details['author'] !== '') $m['author'] = $details['author'];
+            $m['description'] = $details['description'];
+            $m['contact'] = $details['contact'];
+            unset($m['map_header']);
+            $rows[] = $m;
+            if (count($rows) === $limit) break;
+        }
+        if (count($batch) < 300) break;
+    }
+    return $rows;
 }
 
 // a gallery map's picture: 64 x 64 characters (a tile's letter for each 2 x 2 of the map, or P/E a camp,

@@ -1,7 +1,7 @@
 <?php
 // SPDX-License-Identifier: MIT
 // The OpenFP server listing API, at https://openfp.retrocs.org/api/
-// (and over plain http too: the game and the dedicated server don't speak TLS yet).
+// HTTPS is preferred; HTTP remains available for clients without TLS support.
 //
 //   GET  /api/                    the list as JSON: servers, their last day, totals
 //   GET  /api/?format=text        the same, one tab-separated line a server (what the game reads):
@@ -49,6 +49,21 @@ function json_out($data): void
     exit;
 }
 
+// A browser visiting the bare API URL gets the guide. Explicit API queries and
+// clients using */* or no Accept header retain the original machine responses.
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && !isset($_GET['action']) && !isset($_GET['format'])) {
+    header('Vary: Accept');
+    $accept = strtolower($_SERVER['HTTP_ACCEPT'] ?? '');
+    foreach (explode(',', $accept) as $type) {
+        $parts = array_map('trim', explode(';', $type));
+        if (array_shift($parts) !== 'text/html') continue;
+        $quality = 1.0;
+        foreach ($parts as $part) if (str_starts_with($part, 'q=')) $quality = (float)substr($part, 2);
+        if ($quality <= 0) continue;
+        require __DIR__ . '/docs/index.php';
+        exit;
+    }
+}
 $cfg = ofp_config();
 $post = $_SERVER['REQUEST_METHOD'] === 'POST';
 $action = $_REQUEST['action'] ?? ($post ? '' : 'list');
@@ -127,21 +142,12 @@ if (!$post) {
         exit;
     }
     if ($action === 'maps') {                            // the gallery
-        $w = preg_replace('/[^a-z]/', '', strtolower($_GET['world'] ?? ''));
-        $q = $db->prepare("SELECT id, name, author, world, time, size, uploaded, downloads,
-                                  SUBSTRING_INDEX(text, CONCAT(CHAR(10), 'tiles', CHAR(10)), 1) AS map_header
-                           FROM gallery WHERE hidden = 0"
-                          . ($w ? ' AND world = ?' : '') . ' ORDER BY uploaded DESC LIMIT 300');
-        $q->execute($w ? [$w] : []);
-        $rows = $q->fetchAll();
-        foreach ($rows as &$m) {
-            $details = ofp_map_details($m['map_header']);
-            unset($m['map_header']);
-            if ($m['author'] && $details['author'] !== '') $m['author'] = $details['author'];
-            $m['description'] = $details['description'];
-            $m['contact'] = $details['contact'];
-        }
-        unset($m);
+        $w = $_GET['world'] ?? '';
+        $mode = $_GET['mode'] ?? '';
+        if (!is_string($w) || !is_string($mode)) reply(400, 'invalid map filter');
+        $w = preg_replace('/[^a-z]/', '', strtolower($w));
+        if ($mode !== '' && !isset(OFP_MAP_MODES[$mode])) reply(400, 'unknown map mode');
+        $rows = ofp_gallery_maps($w, $mode, 300);
         if (($_GET['format'] ?? '') === 'text') {        // (the game: id, name, author, world, time, size, downloads)
             header('Content-Type: text/plain; charset=utf-8');
             foreach ($rows as $m)

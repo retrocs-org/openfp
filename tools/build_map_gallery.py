@@ -22,6 +22,24 @@ SIDE = {"player": "e9aa4b", "enemy": "30be8b"}
 SIDE_LEN = 96
 
 
+MODE_IDS = ["classic", "flag", "conquest", "hardpoint", "deathmatch", "killconfirmed", "annihilation", "warlord"]
+
+
+def map_modes(fields, world):
+    if fields.get("mode") in MODE_IDS:
+        return [fields["mode"]]
+    if world == "classic":
+        return ["classic"]
+    raw = fields.get("modes", "").strip()
+    tokens = set(raw.replace(",", " ").split()) if raw else (
+        {"annihilation"} if fields.get("arena") == "yes" else {"flag", "conquest", "deathmatch", "warlord"})
+    if tokens & {"conquest", "hardpoint"}:
+        tokens.update(("conquest", "hardpoint"))
+    if tokens & {"deathmatch", "killconfirmed"}:
+        tokens.update(("deathmatch", "killconfirmed"))
+    return [mode for mode in MODE_IDS if mode in tokens]
+
+
 def png(pixels):
     def chunk(kind, data):
         return pack(">I", len(data)) + kind + data + pack(">I", crc32(kind + data))
@@ -65,6 +83,7 @@ def entry(path):
     return {
         "name": fields["name"],
         "world": world,
+        "modes": map_modes(fields, world),
         "time": fields.get("time", "day"),
         "size": size,
         "preview": png(pixels),
