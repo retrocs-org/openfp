@@ -62,7 +62,7 @@ if (!$post && $action === 'version') {
     }
     usort($versions, static fn($a, $b) => version_compare($b, $a));
     $v = $versions[0] ?? '';
-    $u = 'https://openfp.retrocs.org/play/#download';
+    $u = 'https://openfp.retrocs.org/#get';
     if (($_GET['format'] ?? 'text') === 'json') json_out(['version' => $v, 'download' => $u, 'protocol' => OFP_PROTOCOL]);
     header('Content-Type: text/plain; charset=utf-8');
     header('Cache-Control: public, max-age=300');

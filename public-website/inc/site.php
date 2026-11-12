@@ -46,7 +46,7 @@ function page_start(string $title, string $page, string $description = ''): void
 {
     $cfg = site();
     $full = $title === $cfg['site_name'] ? $title : "$title · {$cfg['site_name']}";
-    $nav = ['index' => ['Home', '/'], 'play' => ['Play', '/play/'],
+    $nav = ['index' => ['Home', '/'],
             'servers' => ['Servers', '/server/'], 'activity' => ['Activity', '/activity/'],
             'maps' => ['Maps', '/maps/'], 'screenshots' => ['Screenshots', '/#screenshots'],
             'source' => ['Source', '/source/']];
@@ -62,7 +62,7 @@ function page_start(string $title, string $page, string $description = ''): void
 <meta property="og:image" content="<?= h($cfg['base_url']) ?>/assets/img/20261111-desktop-classic.png">
 <meta name="theme-color" content="#12120e">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/assets/site.css?v=20261112-3">
+<link rel="stylesheet" href="/assets/site.css?v=20261112-4">
 </head>
 <body class="page-<?= h($page) ?>">
 <header class="top">
@@ -100,7 +100,7 @@ function page_end(): void
       <a href="/credits/">Soundtrack credits</a>
       <a href="/privacy/">Privacy</a>
       <a href="/server/">Servers</a>
-      <a href="/play/">Play</a>
+      <a href="/#get">Play</a>
       <a href="/api/">API</a>
       <?php if ($cfg['repo_url']): ?><a href="<?= h($cfg['repo_url']) ?>">GitHub</a><?php endif; ?>
       <?php if ($cfg['contact']): ?><a href="<?= h($cfg['contact']) ?>">Contact</a><?php endif; ?>

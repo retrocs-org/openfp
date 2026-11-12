@@ -2,7 +2,7 @@
 
 This folder is the whole web side of OpenFP:
 
-* **The web site:** `/`, `/server/` (the live server list), `/play/`, `/activity/`,
+* **The web site:** `/` (game, downloads and play guide), `/server/` (the live server list), `/activity/`,
   `/source/` and `/maps/`. Screenshots are on the home page.
 * **The listing API:** `/api/`. Dedicated servers announce themselves to it, and
   the game's FIND SERVERS reads from it.
@@ -75,9 +75,29 @@ a2enmod php8
 (On Debian / Ubuntu: `apt install libapache2-mod-php php-mysql`.)
 
 
+### Refresh an existing site from GitHub
+
+The updater in `scripts/refresh-openfp.sh` copies the latest `main` branch into
+`/srv/www/vhosts/openfp.retrocs.org`. Run it on the web server as root; it needs
+`git`, `rsync` and PHP. From a source checkout:
+
+```sh
+install -m750 scripts/refresh-openfp.sh /srv/www/vhosts/refresh-openfp.sh
+/srv/www/vhosts/refresh-openfp.sh --dry-run
+/srv/www/vhosts/refresh-openfp.sh
+cd /srv/www/vhosts/openfp.retrocs.org
+php inc/migrate.php up
+```
+
+It checks the incoming PHP before updating the site. `config.inc.php` keeps its
+contents, ownership and permissions; local `data/`, `uploads/` and
+`assets/releases/` are also preserved. Obsolete website files are removed.
+The database is left untouched until you run the migration command. Push website
+changes to GitHub's `main` branch before refreshing.
+
 ### Tagged downloads
 
-The home page's Get section and `/play/#download` read published stable releases
+The home page's Get section (`/#get`) reads published stable releases
 from GitHub (`retrocs-org/openfp`). No access token or database change is needed.
 The web host needs
 outbound HTTPS and either PHP cURL or HTTPS streams with `allow_url_fopen`.
@@ -476,7 +496,7 @@ H='Host: openfp.retrocs.org'
 curl -s -H "$H" http://127.0.0.1:6669/api/?action=stats
 # {"servers": 0, "players": 0, "playing": 0, "peak_players_24h": 0, "matches": 0}
 
-for u in / /server/ /play/ /api/ /assets/site.css; do
+for u in / /server/ /source/ /api/ /assets/site.css; do
     curl -s -o /dev/null -w "%{http_code} $u\n" -H "$H" "http://127.0.0.1:6669$u"; done      # all 200
 for u in /config.inc.php /inc/listing.php /inc/migrations.php /README.md; do
     curl -s -o /dev/null -w "%{http_code} $u\n" -H "$H" "http://127.0.0.1:6669$u"; done      # all 403
@@ -699,13 +719,15 @@ files. The full deployment instructions above describe database migrations.
 
 ## Navigation
 
-`/play/` separates **Play a Game** client downloads from **Host a Game** server
-packages. `/activity/` groups Leaderboard, Daily challenge and Matches into
+The home page combines the game overview, **Play a Game** client downloads,
+**Host a Game** server packages, a short play guide, game modes and screenshots.
+Controls and extra lobby help expand on demand. `/activity/` groups Leaderboard, Daily challenge and Matches into
 bookmarkable tabs; configured ladders also appear there. Mode, date, server and
 pagination filters stay in each tab's URL. `/source/` contains the source downloads
 and build instructions. The header links to the home page screenshot section;
 GitHub remains in the footer.
 
-Old `/build/`, `/leaders/`, `/daily/`, `/matches/`, `/ladders/` and `/screenshots/`
+Old `/play/`, `/build/`, `/leaders/`, `/daily/`, `/matches/`, `/ladders/` and `/screenshots/`
 URLs redirect to their new locations, preserving relevant query parameters.
+`/play/` redirects to `/` without replacing existing download or control fragments.
 Deploy the redirect folders too so existing bookmarks keep working.

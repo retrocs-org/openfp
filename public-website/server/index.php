@@ -59,7 +59,7 @@ page_start('Servers', 'servers', 'Public OpenFP servers right now: players, matc
   <?php endif; ?>
   <div class="servers" data-servers data-api="/api/">
     <?php if ($live['ok'] && !$live['servers']): ?>
-      <div class="empty">No public servers right now. <a href="/play/#server">Start one</a>: it takes a minute.</div>
+      <div class="empty">No public servers right now. <a href="/#host-game">Start one</a>: it takes a minute.</div>
     <?php endif; ?>
     <?php foreach ($live['servers'] as $s):
         $full = $s['players'] >= $s['max_players']; ?>

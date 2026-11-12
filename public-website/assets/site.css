@@ -277,3 +277,40 @@ body.zoom-open { overflow: hidden; }
   .section-nav a { padding: 8px 11px; }
   .foot-links { flex-wrap: wrap; }
 }
+
+/* ---- combined home and play ---- */
+.page-index .hero-text { padding-top: 78px; padding-bottom: 68px; }
+.home-section { padding-top: 56px; }
+.home-section + .home-section { margin-top: 52px; padding-top: 40px; border-top: 1px solid var(--line); }
+.page-index .gallery-band { margin-top: 56px; }
+.getting-started { gap: 32px; }
+.getting-started h3, .overview-grid h3 { color: var(--amber); }
+.getting-started ol { padding-left: 22px; margin: 12px 0; }
+.getting-started li { margin-bottom: 8px; }
+.overview-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; margin-top: 24px; }
+.overview-grid p { margin: 10px 0 0; }
+.mode-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 40px; margin: 8px 0 24px; }
+.mode-list > div { padding: 16px 0; border-bottom: 1px solid var(--line); }
+.mode-list dt { color: var(--amber); font-weight: 600; }
+.mode-list dd { margin: 4px 0 0; }
+.guide-detail { margin-top: 14px; padding: 14px 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+.guide-detail summary { cursor: pointer; color: var(--text); font-weight: 600; }
+.guide-detail summary:focus-visible, .gallery-more summary:focus-visible { outline: 2px solid var(--amber); outline-offset: 5px; }
+.guide-detail[open] summary { margin-bottom: 18px; color: var(--amber); }
+.guide-detail p:last-child { margin-bottom: 0; }
+#get, #modes, #start-playing, #how { scroll-margin-top: 100px; }
+@media (max-width: 760px) {
+  .overview-grid { grid-template-columns: 1fr; gap: 24px; }
+}
+@media (max-width: 560px) {
+  .page-index .hero-text { padding-top: 56px; padding-bottom: 48px; }
+  .home-section { padding-top: 40px; }
+  .home-section + .home-section { margin-top: 36px; padding-top: 30px; }
+  .mode-list { grid-template-columns: 1fr; }
+  .guide-detail { padding: 14px; }
+}
+@media (max-width: 560px) {
+  .top-row { min-height: 74px; padding-top: 6px; padding-bottom: 6px; }
+  .top-row > nav { display: grid; grid-template-columns: repeat(3, max-content); gap: 0 3px; }
+  .top-row > nav a { text-align: center; }
+}

@@ -204,8 +204,8 @@ function render_release_downloads(array $catalog): void
         <?php endforeach; ?>
       </div>
       <p class="note">Ubuntu 24.04 or newer. Extract the archive, copy <code>server.cfg.example</code> to <code>server.cfg</code>, review it, then run <code>./ofp_server -c server.cfg</code>.</p>
-      <a href="/source/#server">Server setup and build instructions →</a>
+      <a href="/source/#server">Server setup →</a>
     </section>
-    <div class="release-links"><a href="<?= h(OFP_RELEASE_GITHUB) ?>/releases">All GitHub releases</a><a href="/source/">Build from source</a></div>
+    <div class="release-links"><a href="<?= h(OFP_RELEASE_GITHUB) ?>/releases">All GitHub releases</a></div>
     <?php
 }

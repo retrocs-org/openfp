@@ -14,7 +14,7 @@ return [
         'repo_url' => 'https://github.com/retrocs-org/openfp',             // public source repository
         'contact'  => '',             // e.g. mailto:you@example.org
         // Downloads and client update notices follow published tagged releases automatically.
-        'download_url'   => 'https://openfp.retrocs.org/play/',
+        'download_url'   => 'https://openfp.retrocs.org/#get',
         // the admin page (/admin/: maps in the gallery, forgetting a player): its password.
         // Long and random ('' = no admin page): php -r 'echo bin2hex(random_bytes(16)), "\n";'
         'admin_token'    => '',
