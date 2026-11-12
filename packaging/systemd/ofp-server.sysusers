@@ -1,0 +1,2 @@
+# the OpenFirePower dedicated server runs as this user
+u ofp-server - "OpenFirePower dedicated server" /var/lib/ofp-server /usr/sbin/nologin

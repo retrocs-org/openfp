@@ -1,0 +1,7 @@
+name=Swamp
+biome=swamp
+author=OpenFirePower contributors
+license=MIT
+team_camp=153,170,102
+team_fortress=187,136,85
+water=murky

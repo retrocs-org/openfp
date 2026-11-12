@@ -1,0 +1,7 @@
+name=Winter
+biome=winter
+author=OpenFirePower contributors
+license=MIT
+team_camp=255,255,255
+team_fortress=136,170,136
+water=ice

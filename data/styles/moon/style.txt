@@ -1,0 +1,8 @@
+name=Moon base
+biome=moon
+author=OpenFirePower contributors
+license=MIT
+bollards=1
+team_camp=255,255,255
+team_fortress=255,221,119
+water=ice

@@ -1,0 +1,36 @@
+; $VER: Test-OFP68k 0.1 (11.11.2026)
+; Check replays, simulation speed and a server connection using the active TCP/IP stack.
+; Results are saved under OFP:logs/.
+; Usage: Execute OFP:Test-OFP68k [HOST]
+.key HOST
+.def HOST "openfp.retrocs.org"
+failat 21
+stack 65536
+cd OFP:
+echo "*N== OpenFirePower ofp68k: the replays ==" 
+ofp68k >logs/verify.txt verify replays/classic-23.ofprep replays/desert-11.ofprep replays/extras-storm-31.ofprep replays/map-neon-grid.ofprep replays/winter-37.ofprep
+type logs/verify.txt
+if warn
+  echo "VERIFY: SOMETHING DIFFERS (see OFP:logs/verify.txt)"
+else
+  echo "VERIFY: every checksum matches"
+endif
+echo "*N== the speed (30 s) =="
+ofp68k >logs/bench.txt bench 30 large 4
+type logs/bench.txt
+echo "*N== the network =="
+if exists C:ShowNetStatus
+  C:ShowNetStatus >logs/netstatus.txt INTERFACES
+  type logs/netstatus.txt
+else
+  echo >logs/netstatus.txt "(ShowNetStatus is unavailable; check your TCP/IP stack settings)"
+  type logs/netstatus.txt
+endif
+ofp68k >logs/net.txt net <HOST>
+type logs/net.txt
+if warn
+  echo "NET: no answer, or no TCP/IP stack (see OFP:logs/net.txt)"
+else
+  echo "NET: the server answered"
+endif
+echo "*NAll results: OFP:logs/"

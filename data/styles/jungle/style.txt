@@ -1,0 +1,7 @@
+name=Jungle
+biome=jungle
+author=OpenFirePower contributors
+license=MIT
+team_camp=136,187,85
+team_fortress=204,153,85
+water=murky

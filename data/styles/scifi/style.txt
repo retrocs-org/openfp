@@ -1,0 +1,7 @@
+name=Sci-Fi
+biome=scifi
+author=OpenFirePower contributors
+license=MIT
+team_camp=220,240,255
+team_fortress=240,120,110
+water=waves

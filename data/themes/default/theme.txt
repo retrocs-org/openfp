@@ -1,0 +1,13 @@
+name=Default
+author=OpenFirePower contributors
+license=MIT
+panel=555555
+frame=dd8833
+frame_dark=773311
+rivet=dd8833
+label=bb0000
+value=ffff00
+bar_fuel=888888
+bar_armor=33aa00
+team0=dd8833
+team1=33aa00

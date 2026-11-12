@@ -1,0 +1,7 @@
+name=Wasteland
+biome=wasteland
+author=OpenFirePower contributors
+license=MIT
+team_camp=204,187,153
+team_fortress=153,170,85
+water=murky

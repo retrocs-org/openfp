@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=OpenFP
+GenericName=Tank battle game
+Comment=Classic and enhanced tank combat
+Exec=openfirepower
+Icon=org.openfirepower.OpenFirePower
+Terminal=false
+Categories=Game;ActionGame;
+Keywords=tank;amiga;retro;capture the flag;

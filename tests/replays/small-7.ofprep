@@ -1,0 +1,41 @@
+OFPREPLAY 1
+seed=7 biome=0 time=0 garages=4 versus=0 ai=3 players=1 tanks=2
+player=0 cls=1 team=0 steer=0 bot=3
+map_size=1
+ticks
+250 0000
+check 250 b42d77b7
+250 0000
+check 500 2b441867
+250 0000
+check 750 1b9daa01
+250 0000
+check 1000 6d3660ab
+250 0000
+check 1250 fa40f3f3
+250 0000
+check 1500 ca31ad1e
+250 0000
+check 1750 95a0a842
+250 0000
+check 2000 0b2e4655
+250 0000
+check 2250 56b9560f
+250 0000
+check 2500 e9dbaa48
+250 0000
+check 2750 8eeffff4
+250 0000
+check 3000 9f9a6b70
+250 0000
+check 3250 7da0f35f
+250 0000
+check 3500 fb52a4e0
+250 0000
+check 3750 1f1c6cc8
+250 0000
+check 4000 b6e6cf64
+250 0000
+check 4250 8e47c81d
+92 0000
+end

@@ -1,0 +1,26 @@
+# Flatpak for OpenFirePower:
+#   flatpak-builder --user --install build-flatpak packaging/flatpak/org.openfirepower.OpenFirePower.yml
+#   flatpak run org.openfirepower.OpenFirePower
+# The Freedesktop runtime brings SDL2, SQLite and libcurl.
+app-id: org.openfirepower.OpenFirePower
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+command: openfirepower
+finish-args:
+  - --share=network          # online play and the server list
+  - --share=ipc
+  - --socket=x11
+  - --socket=wayland
+  - --socket=pulseaudio
+  - --device=all             # game pads
+  - --filesystem=xdg-download:ro   # replays and maps downloaded from the web site
+modules:
+  - name: openfirepower
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DOFP_DATA_DIR=/app/share/openfirepower
+    sources:
+      - type: dir
+        path: ../..

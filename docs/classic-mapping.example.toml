@@ -1,0 +1,68 @@
+# Example mapping for tools/ofp_import.py build
+# Copy next to your ripped PNGs, adjust coordinates, then:
+#     python3 tools/ofp_import.py build rip/mapping.toml
+# Paths are relative to this file. The result is git-ignored: never commit it.
+
+name  = "Classic"
+out   = "../data/themes/classic"     # UI theme: tanks, selection art, icons, HUD colours
+style_out = "../data/styles/imported" # map style: the terrain tiles
+biome = "classic"                    # how maps are generated with this style
+# backdrop = ["tiles", 0, 64, 64, 64] # tiled behind play field and selection card
+# tank_scale = 0.5                   # e.g. original tiles 32 px -> ours 16 px:
+                                     # shrink tanks too so proportions match
+
+[sources]                            # short name = PNG you produced with ilbm/planar
+tiles = "tiles.png"
+tanks = "tanks.png"
+cards = "cards.png"
+icons = "panel.png"
+
+[transparent]                        # colour key per source -> becomes transparent
+tanks = [0, 0, 0]
+icons = [0, 0, 0]
+
+# [source, x, y, w, h]                      one cell, used for all 16 columns
+# [source, x, y, w, h, count, step_x, step_y] a strip of cells
+# Cells are scaled to 16x16 if the original tiles are another size.
+# Autotiled types (road, water, wall, building, tree) may give 16 cells, one per
+# neighbour mask N=1 E=2 S=4 W=8; one cell is fine to start with.
+[tiles]
+sand     = ["tiles",   0,  0, 16, 16]
+road     = ["tiles",  16,  0, 16, 16]
+water    = ["tiles",  32,  0, 16, 16]
+rock     = ["tiles",  48,  0, 16, 16]
+tree     = ["tiles",  64,  0, 16, 16]
+stump    = ["tiles",  80,  0, 16, 16]
+wall     = ["tiles",  96,  0, 16, 16]
+rubble   = ["tiles", 112,  0, 16, 16]
+building = ["tiles", 128,  0, 16, 16]
+ruins    = ["tiles", 144,  0, 16, 16]
+
+# Tank frames clockwise starting facing north. Any count (8, 16, 32...) is
+# spread over the game's 32 directions. Keys: <class>_<team>, team 0 = player
+# 1 colours, team 1 = opponent. <class>_1 falls back to <class>_0.
+[tanks]
+light_0  = ["tanks", 0,  0, 16, 16, 16, 16]
+medium_0 = ["tanks", 0, 16, 16, 16, 16, 16]
+heavy_0  = ["tanks", 0, 32, 16, 16, 16, 16]
+
+[cards]                              # selection-screen art, scaled to 176x104
+light  = ["cards",   0, 0, 160, 100]
+medium = ["cards", 160, 0, 160, 100]
+heavy  = ["cards", 320, 0, 160, 100]
+
+[icons]                              # 8x8, drawn tinted: white = full colour
+pow  = ["icons",  0, 0, 8, 8]
+tank = ["icons",  8, 0, 8, 8]
+
+[colors]                             # HUD colours as rrggbb (see docs/THEMES.md)
+# frame = "dd8833"
+# label = "bb0000"
+# value = "ffff00"
+
+# Multi-tile buildings: [source, x, y, w, h], fitted onto the footprint
+# (tower 1x1, bunker 2x2, depot 2x2, barracks 3x2, dome 3x3, hq 4x3 tiles).
+# Add <name>_damaged for the half-destroyed look; otherwise the intact one is used.
+[structures]
+# tower    = ["tiles", 160, 0, 16, 16]
+# barracks = ["tiles", 0, 64, 48, 32]

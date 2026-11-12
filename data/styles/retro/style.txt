@@ -1,0 +1,9 @@
+name=Classic
+biome=classic
+author=OpenFirePower contributors
+license=MIT
+bollards=1
+team_camp=246,190,110
+team_fortress=124,186,106
+water=waves
+faithful=1

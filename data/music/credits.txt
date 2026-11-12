@@ -1,0 +1,11 @@
+# File | Title | Author | Licence
+menu.ogg | Commando Team (Action) [loop cut] | Grégoire Lourme and Iwan Gabovitch (loop edit) | CC BY-SA 3.0
+classic.mp3 | Shattered Reality – Epic Orchestral Dubstep | TheMightyRager | CC BY-SA 3.0
+moon.ogg | Sci-Fi Ambient – Crashed Ship | Ted Kerr (Wolfgang_) | CC BY 3.0
+winter.ogg | Cold Grounds | Anipatok | CC BY 4.0
+desert.mp3 | Desert Wasteland | tcarisland | CC BY 4.0
+jungle.mp3 | Chill Jungle Ambient | Tausdei | CC BY 3.0
+swamp.ogg | Swamp Environment Audio | LokiF | CC0 1.0
+volcanic.wav | Entering the Volcano (Ambience of a Fallen Age) | Umplix | CC0 1.0
+wasteland.mp3 | Space Graveyard – Ambient Track | TinyWorlds | CC0 1.0
+credits.mp3 | Legion's Rally (Oblivion Symphonic Variations) | Li-Hsin Huang (Improbable Cadence) | CC BY 4.0 (explicit author notice)

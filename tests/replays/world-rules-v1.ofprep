@@ -1,0 +1,12 @@
+OFPREPLAY 1
+seed=73 biome=7 time=0 garages=4 versus=1 ai=0 players=2 tanks=2
+player=0 cls=1 team=0 steer=0 bot=0
+player=1 cls=1 team=1 steer=0 bot=0
+world_rules=1 lives=255
+classic_clear=1
+ticks
+250 1100
+check 250 5472848c
+250 1100
+check 500 78b784bf
+end

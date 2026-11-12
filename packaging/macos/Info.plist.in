@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key>                 <string>OpenFP</string>
+  <key>CFBundleDisplayName</key>          <string>OpenFP</string>
+  <key>CFBundleIdentifier</key>           <string>org.openfirepower.OpenFirePower</string>
+  <key>CFBundleExecutable</key>           <string>openfirepower</string>
+  <key>CFBundleIconFile</key>             <string>OpenFirePower</string>
+  <key>CFBundlePackageType</key>          <string>APPL</string>
+  <key>CFBundleShortVersionString</key>   <string>@PROJECT_VERSION@</string>
+  <key>CFBundleVersion</key>              <string>@PROJECT_VERSION@</string>
+  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+  <key>LSApplicationCategoryType</key>    <string>public.app-category.action-games</string>
+  <key>LSMinimumSystemVersion</key>       <string>11.0</string>
+  <key>NSHighResolutionCapable</key>      <true/>
+  <key>NSHumanReadableCopyright</key>     <string>OpenFP. MIT licence.</string>
+  <key>GCSupportsControllerUserInteraction</key><true/>
+</dict>
+</plist>

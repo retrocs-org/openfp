@@ -1,0 +1,8 @@
+name=Remaster
+biome=classic
+author=OpenFirePower contributors
+license=MIT
+bollards=1
+team_camp=255,187,102
+team_fortress=119,187,102
+water=waves

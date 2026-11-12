@@ -1,0 +1,29 @@
+{
+  "github": "https://github.com/retrocs-org/openfp",
+  "github_git": "git@github.com:retrocs-org/openfp.git",
+  "gitlab": "https://gitlab.kladhest.se/retrocs-org/openfp",
+  "gitlab_git": "git@gitlab.kladhest.se:retrocs-org/openfp.git",
+  "gitlab_host": "gitlab.kladhest.se",
+  "builds": "~/Development/builds/OpenFirePower",
+  "packages": "~/Development/packages/OpenFirePower",
+  "tools": "~/Development/tools",
+  "work": "work/release",
+  "targets": ["macos", "windows", "amiga", "linux-x86_64", "linux-aarch64"],
+  "macos": {
+    "identity": "-",
+    "notary_profile": "",
+    "require_notarization": false
+  },
+  "aminet": {
+    "uploader": "",
+    "author": "OpenFirePower contributors",
+    "category": "game/actio"
+  },
+  "env": {},
+  "target_settings": {},
+  "source_branch": "",
+  "credentials": {
+    "github": {"provider": "env", "variable": "GITHUB_TOKEN"},
+    "gitlab": {"provider": "env", "variable": "GITLAB_TOKEN"}
+  }
+}

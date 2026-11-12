@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.openfirepower.OpenFirePower</id>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <name>OpenFP</name>
+  <summary>Classic and enhanced tank combat</summary>
+  <description>
+    <p>Drive into the enemy's fortress, take their flag and bring it home, while they try to do
+       the same to you. Rescue your men, keep an eye on your fuel, and mind the mines.</p>
+    <p>Five worlds, day, dusk and night, split screen for up to four players, a map editor,
+       replays, and online play with ratings, ladders and a map gallery.</p>
+  </description>
+  <launchable type="desktop-id">org.openfirepower.OpenFirePower.desktop</launchable>
+  <url type="homepage">https://openfp.retrocs.org/</url>
+  <content_rating type="oars-1.1">
+    <content_attribute id="violence-cartoon">mild</content_attribute>
+    <content_attribute id="social-chat">intense</content_attribute>
+  </content_rating>
+  <releases>
+    <release version="0.1" date="2026-11-05"/>
+  </releases>
+</component>

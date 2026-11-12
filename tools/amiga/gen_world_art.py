@@ -1,0 +1,159 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+"""The Amiga client's other worlds: each world's native ground in the classic
+palette (the sprites' too: one palette for the screen), and the trees overhead for every world: round
+crowns in the world's greens (as the desktop draws them), cut so neighbouring tiles join into a grove.
+Writes src/platform/amiga/world_art.h:
+
+    world_tiles[8][768][4][8]   desert .. swamp (BIOME_DESERT..BIOME_SWAMP): 12 kinds x 16 columns x 4 quarters
+    canopy_tiles[9][64][5][8]   every world's trees overhead: 16 columns x 4 quarters
+
+    tools/amiga/gen_world_art.py
+"""
+import os
+import sys
+from native_art import canopy_tone, large_crown_tone, terrain_atlas
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from amiga_palette import PALETTE, RGB, TERRAIN_PENS, WORLD_PENS, pick, rgb12, tile_pens   # noqa: E402
+
+ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+WORLDS = ("classic", "desert", "jungle", "winter", "scifi", "volcanic", "wasteland", "moon", "swamp")
+# Canopies have an explicit mask, so the deepest shadows can be opaque.
+CANOPY_PENS = {
+    "classic": (0, 14, 14, 13), "desert": (0, 14, 14, 13), "jungle": (0, 14, 14, 13),
+    "winter": (0, 14, 5, 10), "scifi": (0, 0, 7, 10), "volcanic": (0, 12, 4, 3),
+    "wasteland": (0, 14, 3, 2), "moon": (12, 4, 5, 10), "swamp": (0, 14, 14, 3),
+}
+
+
+def canopy_pen(name, shade, x, y):
+    pens = CANOPY_PENS[name]
+    # Dither the middle green with sparse highlights on the four-bitplane screen.
+    if shade == 2 and pens[1] == pens[2] and (x & 1) == (y & 1) == 0:
+        return 13
+    return pens[shade]
+
+
+def planes_8x8(get):                                  # get(x, y) -> a pen: four planes of eight bytes
+    out = [[0] * 8 for _ in range(4)]
+    for y in range(8):
+        for x in range(8):
+            p = get(x, y)
+            for plane in range(4):
+                if p >> plane & 1:
+                    out[plane][y] |= 0x80 >> x
+    return out
+
+
+def c_tile(planes):
+    return "{ " + ", ".join("{ " + ", ".join("0x%02x" % v for v in pl) + " }" for pl in planes) + " }"
+
+
+def ground_pens(name):
+    """the world's own pens 1 and 2: the two colours its ground needs most, beside the other fourteen"""
+    if name == "classic":
+        return [PALETTE[p] for p in WORLD_PENS]
+    im = terrain_atlas(name)
+    samples = {}
+    data = im.tobytes()
+    for i in range(0, len(data), 4):
+        key = tuple(data[i:i + 3])
+        samples[key] = samples.get(key, 0) + 1
+    return pick(samples, RGB, [p for p in TERRAIN_PENS if p not in WORLD_PENS], len(WORLD_PENS))
+
+
+def world_tiles(name, pens):
+    palette = list(RGB)
+    for p, c in zip(WORLD_PENS, pens):
+        palette[p] = rgb12(c)
+    im = terrain_atlas(name)
+    px = im.load()
+    out = []
+    for kind in range(12):                            # (kind 11, the trees overhead: canopy_tiles; here the bush row)
+        row = 4 if kind == 11 else kind
+        for col in range(16):
+            for q in range(4):
+                ox, oy = col * 16 + (q & 1) * 8, row * 16 + (q >> 1) * 8
+                tile = tile_pens([px[ox + x, oy + y] for y in range(8) for x in range(8)], palette, TERRAIN_PENS)
+                out.append(planes_8x8(lambda x, y: tile[y * 8 + x]))
+    return out
+
+
+def canopy(name):
+    """One crown per tile, extending to join its north/east/south/west neighbours."""
+    tiles = []
+    for col in range(16):
+        image = []
+        for y in range(16):
+            row = []
+            for x in range(16):
+                shade = canopy_tone(x, y, col, 0, name == "winter")
+                pen = None if shade is None else canopy_pen(name, max(0, min(3, int(shade) // 4)), x, y)
+                row.append(pen)
+            image.append(row)
+        for q in range(4):
+            ox, oy = (q & 1) * 8, (q >> 1) * 8
+            mask = [sum(0x80 >> x for x in range(8) if image[oy + y][ox + x] is not None)
+                    for y in range(8)]
+            tiles.append([mask] + planes_8x8(lambda x, y: image[oy + y][ox + x] or 0))
+    return tiles
+
+
+def large_crown(name):
+    """A single rounded, shaded crown for the original's two-by-two tree block."""
+    image = []
+    for y in range(32):
+        row = []
+        for x in range(32):
+            tone = large_crown_tone(x, y)
+            if tone is None:
+                row.append(None)
+                continue
+            pen = 0 if tone < 3 else 1 if tone < 8 else 2 if tone < 13 else 3
+            row.append(canopy_pen(name, pen, x, y))
+        image.append(row)
+    tiles = []
+    for oy in range(0, 32, 8):
+        for ox in range(0, 32, 8):
+            mask = [sum(0x80 >> x for x in range(8) if image[oy + y][ox + x] is not None)
+                    for y in range(8)]
+            tiles.append([mask] + planes_8x8(lambda x, y: image[oy + y][ox + x] or 0))
+    return tiles
+
+
+def main():
+    lines = ["/* SPDX-License-Identifier: MIT */",
+             "/* Generated by tools/amiga/gen_world_art.py: the other worlds' ground, everyone's trees overhead */",
+             "#ifndef OFP_AMIGA_WORLD_ART_H", "#define OFP_AMIGA_WORLD_ART_H", ""]
+    for name in ("classic", "winter"):
+        lines.append("static const uint8_t large_%s_canopy[16][5][8] = {" % name)
+        lines += ["    %s," % c_tile(t) for t in large_crown(name)]
+        lines += ["};", ""]
+    lines.append("static const uint8_t canopy_tiles[%d][64][5][8] = {" % len(WORLDS))
+    for w in WORLDS:
+        lines.append("    {")
+        lines += ["        %s," % c_tile(t) for t in canopy(w)]
+        lines.append("    },")
+    lines += ["};", ""]
+    lines.append("#ifndef OFP_LOCAL_DUEL                     /* (the 68000 build: the classic world only) */")
+    pens = [ground_pens(w) for w in WORLDS]
+    lines.append("static const uint16_t world_ground_pens[%d][%d] = {   /* pens 1, 2 in each world */" %
+                 (len(WORLDS), len(WORLD_PENS)))
+    lines += ["    { %s },   /* %s */" % (", ".join("0x%03x" % c for c in p), w) for p, w in zip(pens, WORLDS)]
+    lines += ["};", ""]
+    lines.append("static const uint8_t world_tiles[%d][768][4][8] = {" % (len(WORLDS) - 1))
+    for w, p in zip(WORLDS[1:], pens[1:]):
+        lines.append("    {")
+        lines += ["        %s," % c_tile(t) for t in world_tiles(w, p)]
+        lines.append("    },")
+    lines += ["};", "#endif", "#endif", ""]
+    path = os.path.join(ROOT, "src", "platform", "amiga", "world_art.h")
+    with open(path, "w") as f:
+        f.write("\n".join(lines))
+    print("world_art.h: %d worlds' ground, %d worlds' trees, %d KB of art" %
+          (len(WORLDS) - 1, len(WORLDS), ((len(WORLDS) - 1) * 768 * 32 + len(WORLDS) * 64 * 40) // 1024))
+
+
+if __name__ == "__main__":
+    main()

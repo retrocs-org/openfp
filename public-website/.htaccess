@@ -1,0 +1,8 @@
+# Only the pages, the API and the assets are served. The rest of this folder -
+# the code in inc/, the settings in config.inc.php, data/ (an old SQLite listing's, if one is
+# still there), the notes -
+# never is.
+RedirectMatch 404 ^/(inc|data)(/|$)
+<FilesMatch "^(config\.inc(\.example)?\.php|dev-router\.php|.*\.(md|sql))$">
+    Require all denied
+</FilesMatch>

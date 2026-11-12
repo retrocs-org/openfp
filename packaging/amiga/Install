@@ -1,0 +1,41 @@
+; SPDX-License-Identifier: MIT
+; OpenFirePower for the Amiga: the Workbench Installer script.
+; Requires a 68040 or 68060. Installs the 16-colour build on any chipset.
+
+(set @app-name "OpenFP")
+(set #cpu (database "cpu"))
+(if (and (<> #cpu "68040") (<> #cpu "68060"))
+  (exit (cat "OpenFP requires a 68040 or 68060 CPU. This Amiga has a " #cpu ".")))
+
+(welcome
+  (cat "OpenFP tank combat\n\n"
+       "Installing the 16-colour version for OCS, ECS and AGA.\n"
+       "It needs AmigaOS 3.0 or newer. On the network, also bsdsocket.library (a TCP/IP stack)."))
+
+(set #where
+  (askdir
+    (prompt "Where should the OpenFP drawer go?")
+    (help @askdir-help)
+    (default @default-dest)))
+(set @default-dest (tackon #where "OpenFP"))
+
+(makedir @default-dest (infos) (prompt "Making the OpenFP drawer") (help @makedir-help))
+
+(copyfiles
+  (prompt "Copying the 16-colour game")
+  (help @copyfiles-help)
+  (source (tackon "bin" "ECS"))
+  (dest @default-dest)
+  (all)
+  (infos))
+(copyfiles (prompt "Copying the maps") (help @copyfiles-help) (source "maps") (dest (tackon @default-dest "maps")) (all))
+(copyfiles (prompt "Copying the soundtrack") (help @copyfiles-help) (source "music") (dest (tackon @default-dest "music")) (all))
+(copyfiles (prompt "Copying the credits") (help @copyfiles-help) (source "Credits") (dest @default-dest))
+(copyfiles (prompt "Copying the ReadMe") (help @copyfiles-help) (source "ReadMe") (dest @default-dest) (infos))
+(copyfiles (prompt "Copying the licence") (help @copyfiles-help) (source "LICENSE") (dest @default-dest))
+(makedir (tackon @default-dest "replays"))
+
+(exit
+  (cat "OpenFP is in " @default-dest ".\n\n"
+       "Double-click OpenFirePower (two players at one Amiga)"
+       " or OpenFirePowerOnline (menus, worlds, the network)."))

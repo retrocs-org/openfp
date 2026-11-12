@@ -1,0 +1,86 @@
+# OpenFirePower dedicated server settings.
+#
+# Ready to go as a public server: it shows on the server list (openfp.retrocs.org), a
+# player on their own gets a match at once (computer players fill the places), and
+# matches, replays and live watching go to the web site. Change at least the first two
+# lines below. Check a change with:  ofp_server -c server.cfg --check
+# Read again while running:  systemctl reload ofp-server  (or kill -HUP)
+
+# ---- who you are ------------------------------------------------------------------------
+name            = OpenFP server   # the name on the server list: make it yours
+motd            = Welcome! Have fun, and play fair.   # shown when players join
+admin_password  =                 # set one: then /login PASSWORD in chat gives the admin commands
+admin_plain_login = no            # yes: also /login PASSWORD sent in the clear (games before 0.1's challenge)
+
+# ---- who can play -----------------------------------------------------------------------
+port            = 29870           # UDP; open it in the firewall (and forward it on the router)
+password        =                 # empty: anyone may join; set: a private server
+max_players     = 8               # signed-in players in the lobby. A match holds up to 8 tanks including bots, depending on the map
+max_per_address = 4               # from one address: 4 lets split screen and a few behind one router in
+min_players     = 1               # people needed for a match; computer players fill the rest
+auto_start      = yes             # no: the lobby host starts after all other humans are ready
+countdown       = 10              # seconds from "everyone's ready" to the match
+start_after     = 30              # start this long after enough are ready, without waiting for everyone (0: wait)
+
+# ---- the public server list and the web site ----------------------------------------------
+public          = yes             # on the server list; code: not listed, but a join code for friends
+                                  # (the log says it); no: only by its address
+stun_server     = stun.l.google.com:19302   # code: how the internet sees this server, so players can get in
+                                  # through its router without a forwarded port (NAT traversal; empty: off)
+listing_url     = https://openfp.retrocs.org/api/
+announce_every  = 60              # seconds (every 20 s while a match is on, for the live page)
+public_host     =                 # the address players should use, if not this machine's own
+share_matches   = yes             # results, leaderboards and ratings on the web site
+share_replays   = yes             # and their replays (to watch in the browser)
+allow_watching  = yes             # spectators in the game, and "Watch live" on the web site
+spectator_delay = 30              # seconds behind: nobody scouts for a friend by watching
+
+# ---- how matches go -----------------------------------------------------------------------
+mode            = versus          # versus (side against side), or together (all against the computer)
+enemy           = normal          # the computer's fortress: easy, normal, hard, or adaptive
+world           = classic         # classic, moon, winter, desert, jungle, swamp, volcanic, wasteland
+# A fixed map supplies its own world. The old scifi setting selects Moon Base.
+time            = day             # day, dusk, night
+weather         = random          # clear, rain, snow, snowstorm, fog, sandstorm, cloudy, thunderstorm, changing, eruption, meteor, random
+pickups         = yes             # enhanced worlds: repair, mines, fuel, speed and rapid-fire; no disables all power-ups; Classic always off
+goal            = flag            # flag; hill (also win by holding the hill alone 2 minutes); conquest (hold
+                                  # capture points for score: 300 wins); deathmatch (sides, no flags: 20 tanks wins);
+                                  # annihilation (every tank for itself: the last one standing);
+                                  # warlord (a boss tank a side: destroying theirs 7 times wins)
+time_limit      = 20              # 1..30 minutes; 0/invalid selects 20, never unlimited
+lives           = 5               # tanks per player: 1..99 or unlimited (0 also means unlimited)
+on_time_up      = points          # points: the better score wins; draw: a draw
+original_camp   = no              # yes: the original's three garages instead of four
+
+# ---- maps (empty: a new random battlefield every match) ---------------------------------------
+map             =                 # one map file for every match
+maps            =                 # a folder of .ofpmap files, played in turn
+rotation        = order           # order, random, or vote (the players choose in the lobby)
+
+# ---- computer players -----------------------------------------------------------------------
+allow_bots      = yes             # computer players in a match (0-7; fill_bots: up to what the map holds)
+bots            = 0               # always this many (0-7) on top of the people (up to what the map holds)
+fill_bots       = yes             # and the free places filled, so nobody waits for a match
+bot_level       = normal          # easy, normal, hard
+
+# ---- what's kept (paths are relative to where the server runs: /var/lib/ofp-server) ------------
+database        = ofp_server.db   # statistics, ratings, bans
+log_file        = ofp_server.log
+log_level       = info            # debug, info, warn, error
+chat_log        = yes
+keep_chat_days  = 30
+keep_match_days = 90              # match history here (0: forever); the web site keeps its own
+replays         =                 # a folder to keep every match's replay (empty: none)
+replays_keep    = 500             # the newest so many there (0: all)
+replays_max_mb  = 1000            # and no more than this many MB (0: no limit)
+desyncs_keep    = 40              # desync-*.ofprep and -server.txt files kept (the newest; 0: all)
+backup_dir      = backups         # a copy of the database every backup_every hours
+backup_every    = 24
+backup_keep     = 7
+status_file     = status.json     # what's on now, for monitoring (rewritten every few seconds)
+metrics_file    =                 # Prometheus text format, for node_exporter's textfile collector
+
+# ---- telling a chat (Rocket.Chat, Slack, Discord, Mattermost: an incoming webhook) ---------------
+webhook_url     =
+webhook_format  = text            # text (Rocket.Chat, Slack, Mattermost), or discord
+webhook_events  = matches,server  # matches: who won; server: it started or stopped

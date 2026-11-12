@@ -1,0 +1,8 @@
+name=Volcano
+biome=volcanic
+author=OpenFirePower contributors
+license=MIT
+bollards=1
+team_camp=187,187,187
+team_fortress=204,102,51
+water=murky

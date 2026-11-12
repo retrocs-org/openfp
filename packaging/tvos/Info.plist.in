@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleName</key><string>OpenFP</string>
+  <key>CFBundleDisplayName</key><string>OpenFP</string>
+  <key>CFBundleIdentifier</key><string>org.openfirepower.OpenFirePower</string>
+  <key>CFBundleExecutable</key><string>OpenFirePower</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>@PROJECT_VERSION@</string>
+  <key>CFBundleVersion</key><string>1</string>
+  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+  <key>LSRequiresIPhoneOS</key><true/>
+  <key>UIDeviceFamily</key><array><integer>3</integer></array>
+  <key>UIApplicationSceneManifest</key><dict>
+    <key>UIApplicationSupportsMultipleScenes</key><false/>
+    <key>UISceneConfigurations</key><dict>
+      <key>UIWindowSceneSessionRoleApplication</key><array><dict>
+        <key>UISceneConfigurationName</key><string>Game</string>
+        <key>UISceneDelegateClassName</key><string>OFPSceneDelegate</string>
+      </dict></array>
+    </dict>
+  </dict>
+  <key>MinimumOSVersion</key><string>15.0</string>
+  <key>GCSupportsControllerUserInteraction</key><true/>
+  <key>UIApplicationSupportsIndirectInputEvents</key><true/>
+  <key>GCSupportedGameControllers</key><array><dict><key>ProfileName</key><string>ExtendedGamepad</string></dict></array>
+  <key>NSLocalNetworkUsageDescription</key><string>Connect to OpenFP game servers on your local network.</string>
+  <key>UIRequiredDeviceCapabilities</key><array><string>arm64</string></array>
+</dict></plist>

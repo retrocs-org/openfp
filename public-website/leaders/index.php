@@ -1,0 +1,55 @@
+<?php
+// SPDX-License-Identifier: MIT
+// The leaderboard: the best-rated players across the public servers.
+require __DIR__ . '/../inc/site.php';
+
+$goal = isset(OFP_GOALS[$_GET['mode'] ?? '']) ? $_GET['mode'] : '';
+$leaders = site_safe(fn() => $goal === '' ? ofp_leaders(100) : ofp_mode_leaders($goal, 100), null);
+page_start('Leaderboard', 'leaders', 'The best-rated OpenFP players on the public servers.');
+?>
+<section class="wrap">
+  <h1>Leaderboard<?= $goal !== '' ? ': ' . h(OFP_GOALS[$goal]) : '' ?></h1>
+  <p class="tabs"><a href="/leaders/"<?= $goal === '' ? ' class="on"' : '' ?>>Overall</a>
+  <?php foreach (OFP_GOALS as $k => $name): ?> <a href="/leaders/?mode=<?= h($k) ?>"<?= $goal === $k ? ' class="on"' : '' ?>><?= h($name) ?></a><?php endforeach; ?></p>
+  <p class="lead">The best players on the public servers, by rating. Each server keeps its own ratings (Elo:
+     everyone starts at 1500; beating a stronger side earns more, losing to a weaker one costs more), so a
+     name is listed with the server it plays on. Servers that haven't been seen for 30 days drop off.</p>
+  <?php if ($goal !== '' && $leaders !== null): ?>
+    <p class="lead">The last 30 days of <?= h(strtolower(OFP_GOALS[$goal])) ?> matches on the public servers that share them: the most wins first.</p>
+    <?php if (!$leaders): ?><p class="notice">No <?= h(strtolower(OFP_GOALS[$goal])) ?> matches shared in the last 30 days.</p>
+    <?php else: ?>
+    <table class="board">
+      <thead><tr><th class="n">#</th><th>Player</th><th class="n">Won</th><th class="n">Matches</th><th class="n">Share</th><th class="n">Tanks</th></tr></thead>
+      <tbody>
+      <?php foreach ($leaders as $i => $l): ?>
+        <tr><td class="n"><?= $i + 1 ?></td><td><b><?= h($l['name']) ?></b></td><td class="n"><b><?= (int)$l['wins'] ?></b></td>
+            <td class="n"><?= (int)$l['matches'] ?></td><td class="n"><?= (int)round(100 * $l['wins'] / max(1, $l['matches'])) ?>%</td>
+            <td class="n"><?= (int)$l['kills'] ?></td></tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+    <?php endif; ?>
+  <?php elseif ($leaders === null): ?>
+    <p class="notice">The leaderboard isn't available right now.</p>
+  <?php elseif (!$leaders): ?>
+    <p class="notice">No rated matches yet. Every finished match on a public server counts.</p>
+  <?php else: ?>
+    <table class="board">
+      <thead><tr><th class="n">#</th><th>Player</th><th>Server</th><th class="n">Rating</th><th class="n">Won</th><th class="n">Matches</th><th class="n">Score</th></tr></thead>
+      <tbody>
+      <?php foreach ($leaders as $i => $l): ?>
+        <tr>
+          <td class="n"><?= $i + 1 ?></td>
+          <td><b><a href="/player/?name=<?= h(urlencode($l['name'])) ?>&amp;server=<?= h(urlencode($l['host'] . ':' . $l['port'])) ?>"><?= h($l['name']) ?></a></b></td>
+          <td><a href="/matches/?server=<?= h(urlencode($l['host'] . ':' . $l['port'])) ?>"><?= h($l['server_name']) ?></a></td>
+          <td class="n"><b><?= (int)$l['rating'] ?></b></td>
+          <td class="n"><?= (int)$l['wins'] ?></td>
+          <td class="n"><?= (int)$l['matches'] ?></td>
+          <td class="n"><?= number_format((int)$l['score']) ?></td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+  <?php endif; ?>
+</section>
+<?php page_end();
