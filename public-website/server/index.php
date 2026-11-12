@@ -25,8 +25,7 @@ page_start('Servers', 'servers', 'Public OpenFP servers right now: players, matc
   <div class="page-head">
     <div>
       <h1>Servers</h1>
-      <p class="muted">Public servers announce themselves every minute; the list checks each one is really there.
-        Join from the game: <b>NETWORK GAME → QUICK MATCH</b> or <b>FIND SERVERS</b>.</p>
+      <p class="lead">Find your next battlefield. Public servers, players and live matches, all in one place.</p>
     </div>
     <ul class="stats" data-live>
       <li><b data-k="servers"><?= (int)$t['servers'] ?></b><span>servers</span></li>
@@ -59,7 +58,7 @@ page_start('Servers', 'servers', 'Public OpenFP servers right now: players, matc
   <?php endif; ?>
   <div class="servers" data-servers data-api="/api/">
     <?php if ($live['ok'] && !$live['servers']): ?>
-      <div class="empty">No public servers right now. <a href="/#host-game">Start one</a>: it takes a minute.</div>
+      <div class="empty">No public servers right now. <a href="/#host-game">Host a game</a> and bring the battlefield online.</div>
     <?php endif; ?>
     <?php foreach ($live['servers'] as $s):
         $full = $s['players'] >= $s['max_players']; ?>
@@ -119,7 +118,7 @@ page_start('Servers', 'servers', 'Public OpenFP servers right now: players, matc
               <span class="leader"><b><?= $i + 1 ?></b> <?= h($l['name']) ?> <span class="muted"><?= (int)$l['rating'] ?></span></span>
             <?php endforeach; ?>
           <?php else: ?><span class="muted small">No rated matches yet.</span><?php endif; ?>
-          <a class="small" href="/activity/?view=matches&amp;server=<?= h(urlencode($s['host'] . ':' . $s['port'])) ?>">Matches &rarr;</a>
+          <a class="small" href="/statistics/?view=matches&amp;server=<?= h(urlencode($s['host'] . ':' . $s['port'])) ?>">Matches &rarr;</a>
         </div>
         <div class="s-addr">
           <code><?= h($s['host']) ?>:<?= (int)$s['port'] ?></code>

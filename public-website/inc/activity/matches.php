@@ -10,16 +10,13 @@ $title = $host ? 'Matches on ' . ($matches[0]['server_name'] ?? "$host:$port") :
 ?>
 <section class="wrap">
   <h2><?= h($title) ?></h2>
-  <p class="lead">Every match a public server finishes, newest first: who played on which side, who won, and how
-     their ratings moved. A replay holds every move of the match:
-     <code>ofp_match verify FILE.ofprep</code> plays it back and checks it.
-     <?php if ($host): ?><a href="/activity/?view=matches">All servers &rarr;</a><?php endif; ?></p>
+  <p>Recent battles, team results and replays from public servers.
+     <?php if ($host): ?><a href="/statistics/?view=matches">All servers &rarr;</a><?php endif; ?></p>
 
   <?php if ($matches === null): ?>
     <p class="notice">The match history isn't available right now.</p>
   <?php elseif (!$matches): ?>
-    <p class="notice">No matches yet<?= $host ? ' on this server' : '' ?>. Servers with <code>share_matches = yes</code>
-       report theirs here.</p>
+    <p class="notice">No shared matches yet<?= $host ? ' on this server' : '' ?>. Finished public battles will appear here.</p>
   <?php else: ?>
     <div class="matches">
       <?php foreach ($matches as $m): ?>
@@ -30,7 +27,7 @@ $title = $host ? 'Matches on ' . ($matches[0]['server_name'] ?? "$host:$port") :
                 <?= $m['mode'] === 'versus' ? 'Versus' : 'Co-op' ?> · <?= h(duration($m['seconds'])) ?></span>
                 <?php if (($m['winner'] ?? '') === 'draw'): ?><span class="tag">A draw</span><?php endif; ?></h3>
             <div class="muted small">
-              <a href="/activity/?view=matches&amp;server=<?= h(urlencode($m['host'] . ':' . $m['port'])) ?>"><?= h($m['server_name']) ?></a>
+              <a href="/statistics/?view=matches&amp;server=<?= h(urlencode($m['host'] . ':' . $m['port'])) ?>"><?= h($m['server_name']) ?></a>
               · <?= h(ago($m['ended'])) ?>
             </div>
           </header>

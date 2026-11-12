@@ -391,7 +391,7 @@ if ($action === 'match') {                              // a listed server's fin
     ], $replay);
     foreach (ofp_ladder_leaders($host, $port) as $slug => [$lname, $leader])   // a new leader?
         if ($leader !== null && ($before[$slug][1] ?? null) !== $leader)
-            ofp_webhook('ladder', "$leader now leads $lname. " . (ofp_settings()['site']['base_url'] ?? '') . "/activity/?view=ladders?l=$slug");
+            ofp_webhook('ladder', "$leader now leads $lname. " . (ofp_settings()['site']['base_url'] ?? '') . "/statistics/?view=ladders&l=$slug");
     reply(200, "ok match $id");
 }
 

@@ -1,7 +1,18 @@
 // SPDX-License-Identifier: MIT
-// OpenFirePower site: a few small touches. Everything works without it.
+// OpenFP site: a few small touches. Everything works without it.
 (function () {
   'use strict';
+
+  function revealAnchor() {
+    var id;
+    try { id = decodeURIComponent(location.hash.slice(1)); } catch (_) { return; }
+    var target = id && document.getElementById(id);
+    if (!target) return;
+    var section = target.closest('details');
+    if (section) section.open = true;
+  }
+  revealAnchor();
+  window.addEventListener('hashchange', revealAnchor);
 
   // screenshots, big
   document.addEventListener('click', function (e) {

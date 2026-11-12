@@ -2,7 +2,7 @@
 
 This folder is the whole web side of OpenFP:
 
-* **The web site:** `/` (game, downloads and play guide), `/server/` (the live server list), `/activity/`,
+* **The web site:** `/` (About, screenshots and downloads), `/server/` (the live server list), `/statistics/`,
   `/source/` and `/maps/`. Screenshots are on the home page.
 * **The listing API:** `/api/`. Dedicated servers announce themselves to it, and
   the game's FIND SERVERS reads from it.
@@ -11,7 +11,7 @@ It is self-contained and is itself the document root. The listing keeps its
 data in **MariaDB**; the site stores nothing of its own.
 
 ```
-index.php  server/  activity/  play/  source/  maps/  assets/
+index.php  server/  statistics/  source/  maps/  assets/
 api/                                 the listing API
 inc/                                 the shared code; migrations.php, migrate.php   (never served)
 config.inc.example.php               the settings: copy to config.inc.php   (never served)
@@ -581,7 +581,7 @@ Unpack the new version as in step 1, then `php inc/migrate.php up`. New settings
 ## Ladders
 
 A ladder is a season on chosen servers, set up in `config.inc.php`, with its standings
-under `/activity/?view=ladders` worked out from the match history: a win is 3 points, ties go to more
+under `/statistics/?view=ladders` worked out from the match history: a win is 3 points, ties go to more
 wins, then the bigger rating gain. With `teams`, fixed teams are ranked too (a team
 plays when one of its members does, and wins when they do). Nothing is stored for it:
 change the dates or the servers and the table follows.
@@ -612,7 +612,7 @@ Servers can play them: `maps = gallery:NAME` in `server.cfg`. To take one down, 
 
 ## The daily challenge
 
-`/activity/?view=daily` shows each day's board. Games send a win's replay; the site checks that it is
+`/statistics/?view=daily` shows each day's board. Games send a win's replay; the site checks that it is
 that day's battlefield and keeps each player's fastest. To count only real wins, put
 `ofp_match` on the web host (`cmake --build build-server`, copy `build-server/ofp_match`
 to e.g. `/usr/local/bin/`) and set `'ofp_match' => '/usr/local/bin/ofp_match'` under
@@ -707,27 +707,30 @@ falls back to that repository, so an existing deployment gains the link without
 replacing its database configuration.
 
 Current screenshots live in `assets/img/20261111-*.png`, with captions and platform
-labels in `inc/screenshots.php`. The home page shows highlights and an expandable
-gallery with the complete set, without cropping. The former `/screenshots/` route
+labels in `inc/screenshots.php`. The About section shows three highlights and an expandable gallery with the rest.
+All thumbnails share an equal-sized frame and retain the complete image; controller
+diagnostics and graphics settings are left out. The former `/screenshots/` route
 redirects to the home page gallery. These are rendered game/editor frames,
 not concept artwork. Keep the full game frame and leave out desktop window borders.
 
-Deploy the complete website update archive, including `inc/`, `activity/`,
+Deploy the complete website update archive, including `inc/`, `statistics/`,
 `source/`, `assets/`, and `maps/`, plus the compatibility redirect folders. Keep the server’s existing `config.inc.php` and uploaded
 files. The full deployment instructions above describe database migrations.
 
 
 ## Navigation
 
-The home page combines the game overview, **Play a Game** client downloads,
-**Host a Game** server packages, a short play guide, game modes and screenshots.
-Controls and extra lobby help expand on demand. `/activity/` groups Leaderboard, Daily challenge and Matches into
-bookmarkable tabs; configured ladders also appear there. Mode, date, server and
-pagination filters stay in each tab's URL. `/source/` contains the source downloads
-and build instructions. The header links to the home page screenshot section;
-GitHub remains in the footer.
+The site uses a shared paper-and-ink layout with orange accents, a gameplay-led
+home page and responsive navigation. The home page introduces OpenFP and the original game's history, followed by
+screenshots and an expandable game-mode list, before **Get the game**, with a compact client list and a separate Linux server panel. Setup instructions and keyboard mappings are
+omitted from the home page. `/statistics/` groups Leaderboard, Daily challenge and
+Matches into bookmarkable tabs; configured ladders also appear there. Mode, date,
+server and pagination filters stay in each tab's URL. `/source/` contains the source
+downloads and expandable build instructions for each platform; direct section links open
+the matching instructions. The header is limited to Home, Servers, Statistics,
+Maps and Source; GitHub remains in the footer.
 
-Old `/play/`, `/build/`, `/leaders/`, `/daily/`, `/matches/`, `/ladders/` and `/screenshots/`
+Old `/activity/`, `/play/`, `/build/`, `/leaders/`, `/daily/`, `/matches/`, `/ladders/` and `/screenshots/`
 URLs redirect to their new locations, preserving relevant query parameters.
-`/play/` redirects to `/` without replacing existing download or control fragments.
+`/play/` redirects to `/` without replacing existing download fragments.
 Deploy the redirect folders too so existing bookmarks keep working.

@@ -175,37 +175,36 @@ function render_release_downloads(array $catalog): void
 {
     $groups = $catalog['groups']; $status = $catalog['status'];
     ?>
-    <section class="game-download-section" aria-labelledby="play-game">
-    <div class="download-heading" id="download"><p class="kicker">Game clients</p><h2 id="play-game">Play a Game</h2>
-      <p>Choose a client for your platform. Play locally or join an online server.</p></div>
-    <?php if ($status === 'stale'): ?><p class="notice small">A release host could not be refreshed. These are recently confirmed links; a newer release may be available.</p><?php endif; ?>
-    <?php if ($status === 'unavailable'): ?><p class="notice small">We couldn’t reach GitHub. Please check <a href="<?= h(OFP_RELEASE_GITHUB) ?>/releases">the releases page</a>.</p><?php endif; ?>
-    <ul class="client-downloads">
-      <?php foreach ([
-          'macos' => ['macOS', 'Apple silicon + Intel · universal app', 'Drag the app from the DMG to Applications, or extract the ZIP.'],
-          'windows' => ['Windows', 'Intel / AMD · x86_64', 'Install the MSI, or extract the portable ZIP.'],
-          'linux-x86_64' => ['Linux', 'Intel / AMD · x86_64', 'Ubuntu 24.04 or newer. Extract the archive and run Play.'],
-          'linux-aarch64' => ['Linux', 'ARM64 · aarch64', 'Ubuntu 24.04 or newer. Extract the archive and run Play.'],
-          'amiga' => ['AmigaOS', 'm68k · 16 colours · 68040 / 68060', 'AmigaOS 3.x, 2 MB Chip RAM and 8 MB Fast RAM. Extract the LHA and run Install.'],
-      ] as $key => [$title, $architecture, $description]): ?>
-        <li class="client-download-row">
-          <div><h3><?= h($title) ?></h3><p class="download-architecture"><?= h($architecture) ?></p><p class="note"><?= h($description) ?></p></div>
-          <div class="client-download-actions"><?php render_release_actions($groups[$key] ?? null, $status); ?></div>
-        </li>
-      <?php endforeach; ?>
-    </ul>
-    </section>
-    <section class="server-download-panel" id="server-downloads" aria-labelledby="host-game">
-      <div class="server-download-heading"><div><p class="kicker">Linux dedicated server</p><h2 id="host-game">Host a Game</h2></div><span class="tag">Headless · up to 8 players</span></div>
-      <p>The server runs the match and bots for clients on every supported platform. No desktop or SDL is required. Choose the architecture of your Linux host.</p>
-      <div class="server-download-options">
-        <?php foreach (['x86_64' => 'Intel / AMD · x86_64', 'aarch64' => 'ARM64 · aarch64'] as $arch => $label): ?>
-          <div class="server-download-row"><h4><?= h($label) ?></h4><?php render_release_actions($groups['server-' . $arch] ?? null, $status); ?></div>
-        <?php endforeach; ?>
-      </div>
-      <p class="note">Ubuntu 24.04 or newer. Extract the archive, copy <code>server.cfg.example</code> to <code>server.cfg</code>, review it, then run <code>./ofp_server -c server.cfg</code>.</p>
-      <a href="/source/#server">Server setup →</a>
-    </section>
-    <div class="release-links"><a href="<?= h(OFP_RELEASE_GITHUB) ?>/releases">All GitHub releases</a></div>
+    <?php if ($status === 'stale'): ?><p class="notice small">Recently confirmed downloads are shown while GitHub is unavailable. A newer release may be available.</p><?php endif; ?>
+    <?php if ($status === 'unavailable'): ?><p class="notice small">We couldn’t check release availability. Please check <a href="<?= h(OFP_RELEASE_GITHUB) ?>/releases">the releases page</a>.</p><?php endif; ?>
+    <div class="download-layout">
+      <section class="game-download-section" aria-labelledby="play-game">
+        <div class="download-heading" id="download"><h3 id="play-game">Play a game</h3><span class="small muted">Game clients</span></div>
+        <ul class="client-downloads">
+          <?php foreach ([
+              'macos' => ['macOS', 'Apple silicon + Intel'],
+              'windows' => ['Windows', 'Intel / AMD · x86_64'],
+              'linux-x86_64' => ['Linux', 'Intel / AMD · x86_64'],
+              'linux-aarch64' => ['Linux', 'ARM64'],
+              'amiga' => ['AmigaOS', 'm68k · 16 colours'],
+          ] as $key => [$title, $architecture]): ?>
+            <li class="client-download-row">
+              <div><h4><?= h($title) ?></h4><p class="download-architecture"><?= h($architecture) ?></p></div>
+              <div class="client-download-actions"><?php render_release_actions($groups[$key] ?? null, $status); ?></div>
+            </li>
+          <?php endforeach; ?>
+        </ul>
+      </section>
+      <section class="server-download-panel" id="server-downloads" aria-labelledby="host-game">
+        <div class="server-download-heading"><p class="eyebrow">Your server. Your battlefield.</p><h3 id="host-game">Host a game.</h3><p>Linux dedicated server</p></div>
+        <div class="server-download-options">
+          <?php foreach (['x86_64' => 'Intel / AMD · x86_64', 'aarch64' => 'ARM64'] as $arch => $label): ?>
+            <div class="server-download-row"><h4><?= h($label) ?></h4><?php render_release_actions($groups['server-' . $arch] ?? null, $status); ?></div>
+          <?php endforeach; ?>
+        </div>
+        <a class="text-link" href="/source/#server">Server setup <span aria-hidden="true">↗</span></a>
+      </section>
+    </div>
+    <div class="release-links"><a href="<?= h(OFP_RELEASE_GITHUB) ?>/releases">All GitHub releases <span aria-hidden="true">↗</span></a><span class="small muted">Downloads appear here when a release is published.</span></div>
     <?php
 }

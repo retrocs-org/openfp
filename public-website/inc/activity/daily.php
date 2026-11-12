@@ -15,9 +15,8 @@ function ticks_time(int $t): string { $s = intdiv($t, 50); return sprintf('%d:%0
 <section class="wrap">
   <h2>Daily challenge</h2>
   <p class="lead"><?= h($when ? $when->format('l j F Y') : (string)$day) ?>:
-    <?= h($worlds[$setup['biome']]) ?>, by <?= h($times[$setup['time']]) ?><?= $setup['weather'] ? ', in a storm' : '' ?><?= $setup['extras'] ? ', with pickups' : '' ?>.
-    The same battlefield for everyone, alone against the computer, in the Bison. Bring their flag home as fast as you can:
-    in the game, TRAINING on the first page, left or right: DAILY CHALLENGE. A new one every day at midnight (UTC).</p>
+    <?= h($worlds[$setup['biome']]) ?> · <?= h(ucfirst($times[$setup['time']])) ?><?= $setup['extras'] ? ' · With pickups' : '' ?>.
+    The same battlefield for everyone. Take the Bison, face the computer and bring the flag home as fast as you can. A new challenge arrives each day at midnight UTC.</p>
   <p class="small">
     <a href="?view=daily&amp;day=<?= h(gmdate('Ymd', ($when ? $when->getTimestamp() : time()) - 86400)) ?>">&larr; the day before</a>
     <?php if ($day < ofp_daily_today()): ?> · <a href="?view=daily&amp;day=<?= h(gmdate('Ymd', $when->getTimestamp() + 86400)) ?>">the day after &rarr;</a><?php endif; ?>

@@ -27,7 +27,7 @@ $table = $ladder ? site_safe(fn() => ofp_ladder_table($ladder), null) : null;
   <p class="lead"><?= h($ladder['about'] ?? '') ?></p>
   <p class="muted"><?= h($ladder['from'] ?? '') ?> to <?= h($ladder['to'] ?? '') ?>
      <?= $table && $table['running'] ? '· <span class="tag on">On now</span>' : '' ?>
-     · on <?php foreach ($ladder['servers'] ?? [] as $i => $sv): ?><?= $i ? ', ' : '' ?><a href="/activity/?view=matches&amp;server=<?= h(urlencode($sv)) ?>"><?= h($sv) ?></a><?php endforeach; ?>
+     · on <?php foreach ($ladder['servers'] ?? [] as $i => $sv): ?><?= $i ? ', ' : '' ?><a href="/statistics/?view=matches&amp;server=<?= h(urlencode($sv)) ?>"><?= h($sv) ?></a><?php endforeach; ?>
      · a win is 3 points<?= !empty($ladder['min_matches']) ? ' · ranked after ' . (int)$ladder['min_matches'] . ' matches' : '' ?></p>
   <?php if ($table === null): ?>
     <p class="notice">The standings aren't available right now.</p>
@@ -66,6 +66,6 @@ $table = $ladder ? site_safe(fn() => ofp_ladder_table($ladder), null) : null;
       <p class="muted small"><?= (int)$table['matches'] ?> matches so far. Ties on points go to more wins, then the bigger rating gain.</p>
     <?php endif; ?>
   <?php endif; ?>
-  <?php if (count($all) > 1): ?><p><a href="/activity/?view=ladders">All ladders &rarr;</a></p><?php endif; ?>
+  <?php if (count($all) > 1): ?><p><a href="/statistics/?view=ladders">All ladders &rarr;</a></p><?php endif; ?>
 <?php endif; ?>
 </section>

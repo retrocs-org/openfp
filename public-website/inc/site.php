@@ -47,8 +47,8 @@ function page_start(string $title, string $page, string $description = ''): void
     $cfg = site();
     $full = $title === $cfg['site_name'] ? $title : "$title · {$cfg['site_name']}";
     $nav = ['index' => ['Home', '/'],
-            'servers' => ['Servers', '/server/'], 'activity' => ['Activity', '/activity/'],
-            'maps' => ['Maps', '/maps/'], 'screenshots' => ['Screenshots', '/#screenshots'],
+            'servers' => ['Servers', '/server/'], 'statistics' => ['Statistics', '/statistics/'],
+            'maps' => ['Maps', '/maps/'],
             'source' => ['Source', '/source/']];
     ?><!doctype html>
 <html lang="en">
@@ -60,22 +60,24 @@ function page_start(string $title, string $page, string $description = ''): void
 <meta property="og:title" content="<?= h($full) ?>">
 <meta property="og:description" content="<?= h($description ?: $cfg['tagline']) ?>">
 <meta property="og:image" content="<?= h($cfg['base_url']) ?>/assets/img/20261111-desktop-classic.png">
-<meta name="theme-color" content="#12120e">
+<meta name="theme-color" content="#f5f2e9">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/assets/site.css?v=20261112-4">
+<link rel="stylesheet" href="/assets/site.css?v=20261112-6">
 </head>
 <body class="page-<?= h($page) ?>">
+<a class="skip-link" href="#main">Skip to content</a>
 <header class="top">
   <div class="wrap top-row">
     <a class="brand" href="/"><img src="/assets/favicon.svg" alt="" width="28" height="28"><span>Open<b>FP</b></span></a>
-    <nav>
+    <nav aria-label="Main navigation">
       <?php foreach ($nav as $key => [$label, $href]): ?>
         <a href="<?= h($href) ?>"<?= $key === $page ? ' aria-current="page"' : '' ?>><?= h($label) ?></a>
       <?php endforeach; ?>
     </nav>
+    <a class="nav-download" href="/#get">Get the game <span aria-hidden="true">↗</span></a>
   </div>
 </header>
-<main>
+<main id="main">
 <?php
 }
 
@@ -93,21 +95,22 @@ function page_end(): void
 <footer class="bottom">
   <div class="wrap foot-row">
     <div>
-      <b>OpenFP</b> is free software (MIT), written from scratch. It needs no files from the original game;
-      <i>Fire Power</i> (1987) is by Silent Software and MicroIllusions, and this is a tribute, not affiliated with them.
+      <a class="footer-brand" href="/">OpenFP<span aria-hidden="true">.</span></a>
+      <p>Classic tank combat. New battlefields.<br>Free, open source, and made to be played together.</p>
+      <small>MIT licensed. An independent tribute, made from scratch.</small>
     </div>
     <div class="foot-links">
       <a href="/credits/">Soundtrack credits</a>
       <a href="/privacy/">Privacy</a>
       <a href="/server/">Servers</a>
-      <a href="/#get">Play</a>
+      <a href="/#get">Downloads</a>
       <a href="/api/">API</a>
       <?php if ($cfg['repo_url']): ?><a href="<?= h($cfg['repo_url']) ?>">GitHub</a><?php endif; ?>
       <?php if ($cfg['contact']): ?><a href="<?= h($cfg['contact']) ?>">Contact</a><?php endif; ?>
     </div>
   </div>
 </footer>
-<script src="/assets/site.js?v=20261112-1" defer></script>
+<script src="/assets/site.js?v=20261112-6" defer></script>
 </body>
 </html>
 <?php

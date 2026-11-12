@@ -7,11 +7,9 @@ $leaders = site_safe(fn() => $goal === '' ? ofp_leaders(100) : ofp_mode_leaders(
 ?>
 <section class="wrap">
   <h2>Leaderboard<?= $goal !== '' ? ': ' . h(OFP_GOALS[$goal]) : '' ?></h2>
-  <p class="tabs"><a href="/activity/?view=leaders"<?= $goal === '' ? ' class="on"' : '' ?>>Overall</a>
-  <?php foreach (OFP_GOALS as $k => $name): ?> <a href="/activity/?view=leaders&amp;mode=<?= h($k) ?>"<?= $goal === $k ? ' class="on"' : '' ?>><?= h($name) ?></a><?php endforeach; ?></p>
-  <p class="lead">The best players on the public servers, by rating. Each server keeps its own ratings (Elo:
-     everyone starts at 1500; beating a stronger side earns more, losing to a weaker one costs more), so a
-     name is listed with the server it plays on. Servers that haven't been seen for 30 days drop off.</p>
+  <p class="tabs"><a href="/statistics/?view=leaders"<?= $goal === '' ? ' class="on"' : '' ?>>Overall</a>
+  <?php foreach (OFP_GOALS as $k => $name): ?> <a href="/statistics/?view=leaders&amp;mode=<?= h($k) ?>"<?= $goal === $k ? ' class="on"' : '' ?>><?= h($name) ?></a><?php endforeach; ?></p>
+  <p>The best-rated players across public servers. Ratings are tracked separately for each server.</p>
   <?php if ($goal !== '' && $leaders !== null): ?>
     <p class="lead">The last 30 days of <?= h(strtolower(OFP_GOALS[$goal])) ?> matches on the public servers that share them: the most wins first.</p>
     <?php if (!$leaders): ?><p class="notice">No <?= h(strtolower(OFP_GOALS[$goal])) ?> matches shared in the last 30 days.</p>
@@ -39,7 +37,7 @@ $leaders = site_safe(fn() => $goal === '' ? ofp_leaders(100) : ofp_mode_leaders(
         <tr>
           <td class="n"><?= $i + 1 ?></td>
           <td><b><a href="/player/?name=<?= h(urlencode($l['name'])) ?>&amp;server=<?= h(urlencode($l['host'] . ':' . $l['port'])) ?>"><?= h($l['name']) ?></a></b></td>
-          <td><a href="/activity/?view=matches&amp;server=<?= h(urlencode($l['host'] . ':' . $l['port'])) ?>"><?= h($l['server_name']) ?></a></td>
+          <td><a href="/statistics/?view=matches&amp;server=<?= h(urlencode($l['host'] . ':' . $l['port'])) ?>"><?= h($l['server_name']) ?></a></td>
           <td class="n"><b><?= (int)$l['rating'] ?></b></td>
           <td class="n"><?= (int)$l['wins'] ?></td>
           <td class="n"><?= (int)$l['matches'] ?></td>
