@@ -2,6 +2,7 @@
  * .ofpmap: maps as text, read and written in memory. See world.h. */
 #include <string.h>
 #include "core/world.h"
+#include "common/soundtrack.h"
 
 static const char TILE_CH[TILE_COUNT] = {
     [TILE_SAND] = '.', [TILE_ROAD] = '=', [TILE_WATER] = '~', [TILE_ROCK] = '^', [TILE_TREE] = 'T',
@@ -365,6 +366,7 @@ static int mapfile_load_impl(Map *m, Base bases[2], Biome *biome, char *name, in
     int px = 4, py = MAP_H - BASE_H - 8, ex = MAP_W - BASE_W - 4, ey = 4, row = 0, i, m_time = TIME_DAY;
     int m_weather = -1, m_extras = -1, garage_bases = 0;                   /* (-1: the file doesn't say) */
     int compounds[2][4] = {{0}}, custom_mode = -1, file_size = SIZE_LARGE;
+    char music[32] = "";
     if (!starts(p, "OFPMAP")) return -1;
     map_fill(m, TILE_SAND);
     m->num_points = 0;
@@ -378,6 +380,8 @@ static int mapfile_load_impl(Map *m, Base bases[2], Biome *biome, char *name, in
             if (n > name_len - 1) n = name_len - 1;
             memcpy(name, p + 5, (size_t)n);
             name[n] = 0;
+        } else if (!tiles && starts(p, "music=")) {
+            read_detail(music, sizeof music, p + 6);
         } else if (!tiles && starts(p, "description=")) {
             read_detail(m->details.description, sizeof m->details.description, p + 12);
         } else if (!tiles && starts(p, "author=")) {
@@ -583,6 +587,7 @@ static int mapfile_load_impl(Map *m, Base bases[2], Biome *biome, char *name, in
             }
         }
     if (!m->custom_bases && !m->arena && !garage_bases) worldgen_protect_camp(m, &bases[TEAM_PLAYER]);   /* a fair start: no enemy guns at our gate */
+    m->music = (uint8_t)soundtrack_choice(mapfile_biome(text), music);
     m->time = (uint8_t)m_time;
     m->has_weather = m_weather >= 0; m->weather = (uint8_t)(m_weather > 0 ? m_weather : 0);
     m->has_extras = m_extras >= 0;   m->extras = (uint8_t)(m_extras > 0 ? m_extras : 0);
@@ -615,6 +620,7 @@ static unsigned mapfile_save_impl(const Map *m, const Base bases[2], Biome biome
     PUTS("\nbiome=");
     PUTS(biome_name(biome));
     PUTS("\ntime="); PUTS(time_name(m->time));
+    if (m->music) { PUTS("\nmusic="); PUTS(soundtrack_key(biome, m->music)); }
     if (biome == BIOME_CLASSIC && m->custom_bases && m->mode != MAP_MODE_CLASSIC) {
         /* Keep a Classic-world map clear even when it uses enhanced rules and the host sets weather. */
         PUTS("\nweather=clear");

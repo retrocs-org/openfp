@@ -289,6 +289,7 @@ typedef struct {
     uint32_t tick;
     uint32_t time_limit;             /* ticks; 0 = none. When it's up: */
     uint8_t enhanced_rules, no_powerups; /* surface physics and temporary power-ups */
+    uint8_t legacy_arena_spawns;     /* old recordings used alternating player slots */
     uint8_t life_limit, vehicle_world; /* 0: legacy lives/standard vehicles; 255: unlimited */
     uint8_t  time_rule;              /* TIME_RULE_*: the side with more points wins, or a draw */
     uint8_t  time_up;                /* the time ran out (winner: by the rule, -1 for a draw) */

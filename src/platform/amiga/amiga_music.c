@@ -8,6 +8,7 @@
 #include <devices/audio.h>
 #include <clib/alib_protos.h>
 #include "common/soundtrack.h"
+#include "platform/amiga/music_levels.h"
 #include <exec/types.h>
 #include <exec/memory.h>
 #include <exec/interrupts.h>
@@ -39,11 +40,20 @@ static struct MsgPort *pcm_port;
 static UBYTE *pcm_chip;
 static struct IOAudio *pcm_io[PCM_BUFFERS];
 static int pcm_queued[PCM_BUFFERS];
+static UWORD pcm_level = 64;
 
 static const char *const pcm_name[SOUNDTRACK_COUNT] = {
     [BIOME_CLASSIC] = "classic", [BIOME_DESERT] = "desert", [BIOME_JUNGLE] = "jungle",
     [BIOME_WINTER] = "winter", [BIOME_VOLCANIC] = "volcanic", [BIOME_WASTELAND] = "wasteland",
-    [BIOME_MOON] = "moon", [BIOME_SWAMP] = "swamp", [SOUNDTRACK_MENU] = "menu", [SOUNDTRACK_CREDITS] = "credits"
+    [BIOME_MOON] = "moon", [BIOME_SWAMP] = "swamp", [SOUNDTRACK_MENU] = "menu", [SOUNDTRACK_CREDITS] = "credits",
+    [SOUNDTRACK_CANNON_TUBE] = "cannon-tube", [SOUNDTRACK_SNOW_THEME] = "snow-theme",
+    [SOUNDTRACK_SPACE_ATMOSPHERE] = "space-atmosphere",
+    [SOUNDTRACK_NEW_BEGINNING] = "new-beginning",
+    [SOUNDTRACK_LOST_DESERT] = "lost-in-the-desert",
+    [SOUNDTRACK_DESERT_DREAMS] = "desert-of-dreams-mix",
+    [SOUNDTRACK_URBAN_JUNGLE] = "urban-jungle-2061",
+    [SOUNDTRACK_JUNGLE_PRO_SENSORY] = "jungle-pro-sensory",
+    [SOUNDTRACK_IRON_WASTELAND] = "iron-wasteland"
 };
 
 static void pcm_stop(void)
@@ -81,7 +91,7 @@ static int pcm_queue(int index)
     io->ioa_Data = data;
     io->ioa_Length = PCM_BLOCK;
     io->ioa_Period = PCM_PERIOD;
-    io->ioa_Volume = gain;
+    io->ioa_Volume = (gain * pcm_level + 32) / 64;
     io->ioa_Cycles = 1;
     BeginIO((struct IORequest *)io);
     pcm_queued[index] = 1;
@@ -93,6 +103,7 @@ static int pcm_start(int which)
     char path[64];
     int i;
     if (!pcm_name[which]) return 0;
+    pcm_level = amiga_music_level[which];
     snprintf(path, sizeof path, "PROGDIR:music/%s.pcm", pcm_name[which]);
     pcm_file = fopen(path, "rb");
     if (!pcm_file) return 0;
@@ -185,7 +196,8 @@ void music_play(int which)
     if (which == song) return;
     static const int fallback[SOUNDTRACK_COUNT] = {
         MUSIC_CLASSIC, MUSIC_DESERT, MUSIC_JUNGLE, MUSIC_WINTER, MUSIC_SCIFI,
-        MUSIC_DESERT, MUSIC_DESERT, MUSIC_SCIFI, MUSIC_JUNGLE, MUSIC_MENU, MUSIC_MENU
+        MUSIC_DESERT, MUSIC_DESERT, MUSIC_SCIFI, MUSIC_JUNGLE, MUSIC_MENU, MUSIC_MENU, MUSIC_DESERT, MUSIC_WINTER,
+        MUSIC_SCIFI, MUSIC_DESERT, MUSIC_DESERT, MUSIC_DESERT, MUSIC_JUNGLE, MUSIC_JUNGLE, MUSIC_DESERT
     };
     if (which < 0 || which >= SOUNDTRACK_COUNT) which = -1;
     if (pcm_file) pcm_stop();

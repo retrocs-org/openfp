@@ -131,6 +131,7 @@ int audio_init(int effects_level, int music_level)
     }
     dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
     if (!dev) { music_close(); return -1; }
+    music_set_device(dev);
     stereo = have.channels == 2;
     load_samples();
     audio_set_volume(effects_level);
@@ -140,9 +141,9 @@ int audio_init(int effects_level, int music_level)
 
 void audio_shutdown(void)
 {
+    music_close();
     if (dev) SDL_CloseAudioDevice(dev);
     dev = 0;
-    music_close();
     free_samples();
 }
 

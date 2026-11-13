@@ -38,6 +38,7 @@ static int match_start_with_limit(Game *g, const MatchSetup *ms, const char *map
     }
     g->versus = ms->versus;
     g->bot_commands = ms->bot_commands;
+    g->legacy_arena_spawns = ms->legacy_arena_spawns;
     g->bot_rng = (ms->seed ^ 0x76b9d9edu) | 1u;
     g->relaxed_pace = ms->relaxed_pace;
     g->time_limit = (uint32_t)(ms->legacy_rules ? ms->time_limit :
@@ -153,6 +154,7 @@ uint32_t match_hash(const MatchSetup *ms, const char *map_text)
     h = mix(h, ms->seed); h = mix(h, ms->biome); h = mix(h, ms->time); h = mix(h, ms->camp_garages);
     if (!ms->legacy_rules) { h = mix(h, 0x574f524cu); h = mix(h, ms->lives); }
     if (!ms->legacy_rules && !ms->legacy_surfaces) { h = mix(h, 0x53555246u); h = mix(h, ms->no_powerups); }
+    if (!ms->legacy_arena_spawns) h = mix(h, 0x5350574eu);
     h = mix(h, ms->versus); h = mix(h, ms->ai_level); h = mix(h, ms->players);
     for (i = 0; i < MATCH_PLAYERS; i++) { h = mix(h, ms->cls[i]); h = mix(h, ms->team[i]); h = mix(h, ms->steer[i]); h = mix(h, ms->bot[i]); }
     if (ms->time_limit) { h = mix(h, ms->time_limit); h = mix(h, ms->time_rule); }   /* (unchanged hash without one) */

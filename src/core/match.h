@@ -32,6 +32,7 @@ typedef struct {
     uint16_t time_limit;             /* seconds; 0 selects 20 minutes, maximum 30 minutes */
     uint8_t lives;                   /* 0 selects 5; 1..99 tanks per player; 255 unlimited */
     uint8_t legacy_surfaces;         /* recordings before ice/oil and temporary buffs */
+    uint8_t legacy_arena_spawns;     /* recordings before team-order-independent arena starts */
     uint8_t no_powerups;             /* authoritative local/server switch */
     uint8_t legacy_rules;            /* old recordings keep original vehicles/lives/timing */
     uint8_t  time_rule;              /* TIME_RULE_*: when it's up, more points wins, or a draw */

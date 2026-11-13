@@ -107,7 +107,7 @@ $(OUT)/common/net.o $(OUT)/platform/amiga/net_amiga.o $(OUT)/online/common/net.o
 $(OUT)/common/replay.o $(OUT)/platform/amiga/ofp68k.o $(OUT)/online/common/replay.o: src/common/replay.h
 $(OUT)/platform/amiga/ofp68k.o: src/common/net.h
 $(OUT)/online/platform/amiga/amiga_sound.o $(OUT)/local/platform/amiga/amiga_sound.o: src/platform/amiga/sounds_8bit.h src/platform/amiga/amiga_sound.h
-$(OUT)/online/platform/amiga/amiga_music.o $(OUT)/local/platform/amiga/amiga_music.o: src/platform/amiga/music_mods.h src/platform/amiga/modplay.h src/platform/amiga/amiga_music.h src/common/soundtrack.h
+$(OUT)/online/platform/amiga/amiga_music.o $(OUT)/local/platform/amiga/amiga_music.o: src/platform/amiga/music_mods.h src/platform/amiga/modplay.h src/platform/amiga/amiga_music.h src/common/soundtrack.h src/platform/amiga/music_levels.h
 $(OUT)/online/platform/amiga/modplay.o $(OUT)/local/platform/amiga/modplay.o: src/platform/amiga/modplay.h
 $(OUT)/online/platform/amiga/menu_settings.o: src/platform/amiga/menu_settings.h src/platform/amiga/amiga_music.h
 $(OUT)/online/platform/amiga/menu_settings.o $(filter %/amiga_music.o %/amiga_sound.o,$(LOCAL_OBJS) $(ONLINE_COMMON)): src/common/volume.h
@@ -137,3 +137,7 @@ clean:
 	rm -rf $(OUT)
 
 .PHONY: all clean local online
+
+# Update the small hardware volume table when a packaged playback loop changes.
+src/platform/amiga/music_levels.h: tools/amiga/music_levels.py src/common/soundtrack.h $(wildcard data/music/amiga/*.pcm)
+	python3 tools/amiga/music_levels.py

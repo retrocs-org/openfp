@@ -78,3 +78,6 @@ service_account.json
 !data/sounds/original/
 data/sounds/original/*
 !data/sounds/original/laugh-evil-1.ogg
+
+# Local source snapshot
+/Archive.zip

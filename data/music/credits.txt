@@ -9,3 +9,12 @@ swamp.ogg | Swamp Environment Audio | LokiF | CC0 1.0
 volcanic.wav | Entering the Volcano (Ambience of a Fallen Age) | Umplix | CC0 1.0
 wasteland.mp3 | Space Graveyard – Ambient Track | TinyWorlds | CC0 1.0
 credits.mp3 | Legion's Rally (Oblivion Symphonic Variations) | Li-Hsin Huang (Improbable Cadence) | CC BY 4.0 (explicit author notice)
+cannon-tube.ogg | Cannon Tube | Gundatsch | CC BY 3.0
+snow-theme.ogg | Through the Snow | Cleyton Kauffman | CC0 1.0
+space-atmosphere.mp3 | Space Atmosphere | Alexandr Zhelanov | CC BY 3.0
+new-beginning.ogg | A New Beginning | remaxim | CC BY-SA 3.0
+lost-in-the-desert.mp3 | Lost in the Desert | Eldritch Grim | CC0 1.0
+desert-of-dreams-mix.ogg | Desert of Dreams Mix | Insydnis / Tausdei / glitchart | CC BY 3.0
+urban-jungle-2061.mp3 | Urban Jungle 2061 | Eric Matyas / Soundimage.org | CC BY 4.0
+jungle-pro-sensory.wav | Jungle | Alex McCulloch (Pro Sensory) | CC0 1.0
+iron-wasteland.ogg | Iron Wasteland | Alexandr Zhelanov | CC BY 4.0

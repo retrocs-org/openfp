@@ -123,6 +123,7 @@ typedef struct {
     uint16_t  sid[MAP_H][MAP_W];        /* 1-based index into st[], 0 = none */
     Structure st[MAX_STRUCTS];
     int       num_st;
+    uint8_t   music;                    /* world-local soundtrack choice; 0 keeps the default */
     uint8_t   time;                     /* TIME_*: when the battle is fought (from the map file) */
     uint8_t   size;                     /* SIZE_*: how big (size= line; LARGE without one, the original's) */
     int16_t   w, h;                     /* its own width and height, tiles; outside them, rock */

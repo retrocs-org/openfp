@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 #include <SDL.h>
 #include <limits.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include "platform/sdl2/music_pcm.h"
@@ -58,4 +59,33 @@ int16_t *music_pcm_load(const char *path, int rate, int *samples)
     else if (!strcmp(extension, ".mp3")) drmp3_free(input, NULL);
     else free(input);
     return output;
+}
+
+float music_pcm_loudness_gain(const int16_t *pcm, int samples, int rate)
+{
+    int i, start, peak = 0, block = rate * 2 / 5;
+    double max_power = 0, energy = 0, active = 0, gain;
+    if (!pcm || samples <= 0 || block <= 0) return 1.0f;
+    /* Relative gating excludes silence and quiet intros, without riding the volume. */
+    for (start = 0; start < samples; start += block) {
+        int end = samples - start < block ? samples : start + block;
+        double sum = 0;
+        for (i = start; i < end; i++) {
+            int value = abs((int)pcm[i]);
+            if (value > peak) peak = value;
+            sum += (double)value * value;
+        }
+        if (sum / (end - start) > max_power) max_power = sum / (end - start);
+    }
+    if (!peak || !max_power) return 1.0f;
+    for (start = 0; start < samples; start += block) {
+        int end = samples - start < block ? samples : start + block;
+        double sum = 0;
+        for (i = start; i < end; i++) sum += (double)pcm[i] * pcm[i];
+        if (sum / (end - start) >= max_power * 0.01) { energy += sum; active += end - start; }
+    }
+    gain = 6000.0 / sqrt(energy / active);
+    if (gain > 4.0) gain = 4.0;
+    if (gain * peak > 30000.0) gain = 30000.0 / peak;
+    return (float)gain;
 }

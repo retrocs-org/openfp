@@ -393,7 +393,7 @@ void update_music(int in_match)
     if (menu_page == MENU_ABOUT) menu_song = SOUNDTRACK_CREDITS;
 #endif
     int want = !music_on || in_match < 0 ? -1 : in_match ?
-        (game.biome < BIOME_COUNT ? game.biome : BIOME_CLASSIC) : menu_song;
+        soundtrack_for_map(game.biome < BIOME_COUNT ? game.biome : BIOME_CLASSIC, game.map.music) : menu_song;
     if (want != music_song()) music_play(want);
     music_update();
 }

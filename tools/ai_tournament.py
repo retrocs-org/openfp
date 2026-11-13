@@ -107,11 +107,86 @@ def report(folder, records):
                                  stats.get("deaths", ""), stats.get("objective_score", "")])
 
 
+def baseline_plan(folder):
+    """Read data from a previous run; never execute its recorded command."""
+    folder = Path(folder).resolve()
+    manifest = json.loads((folder / "manifest.json").read_text())
+    maps = {}
+    for item in manifest["maps"]:
+        path = (folder / item["snapshot"]).resolve()
+        if folder not in path.parents or not path.is_file() or digest(path) != item["sha256"]:
+            raise ValueError("missing or changed baseline map: " + item["snapshot"])
+        name = item.get("name", Path(item["source"]).name)
+        if name in maps:
+            raise ValueError("ambiguous baseline map name: " + name)
+        maps[name] = path
+    plan = []
+    for line in (folder / "results.jsonl").read_text().splitlines():
+        row = json.loads(line)
+        if row.get("status") != "ok":
+            continue
+        command = row["command"]
+        if not isinstance(command, list) or not all(isinstance(value, str) for value in command):
+            raise ValueError("invalid baseline command settings")
+        # These two bounded numeric settings are the only command fields reused.
+        def setting(flag):
+            if command.count(flag) != 1:
+                raise ValueError("missing or duplicate baseline setting: " + flag)
+            return int(command[command.index(flag) + 1])
+        side, minutes = setting("--side"), setting("--minutes")
+        if (row["map"] not in maps or row["goal"] not in GOALS or
+            row["profile"] not in {"server", "local"} or row["level"] not in {"easy", "normal", "hard"} or
+            not isinstance(row["seed"], int) or not 0 <= row["seed"] <= 0xffffffff or
+            not 1 <= side <= 4 or not 1 <= minutes <= 30):
+            raise ValueError("invalid baseline scenario: " + str(row.get("id")))
+        plan.append((row, maps[row["map"]], side, minutes))
+    plan.sort(key=lambda item: item[0]["id"])
+    if not plan:
+        raise ValueError("baseline contains no completed matches")
+    return folder, plan
+
+
+def comparison(folder, records, baseline):
+    before = {row["id"]: row for row, *_ in baseline}
+    pairs = [(before[row["baseline_id"]], row) for row in records
+             if row.get("status") == "ok" and row.get("baseline_id") in before]
+    def metrics(rows):
+        teams = [team for row in rows for team in row["result"]["teams"]]
+        alive = sum(team["alive_ticks"] for team in teams)
+        seconds = sum(team["alive_ticks"] / row["result"]["tick_rate"]
+                      for row in rows for team in row["result"]["teams"])
+        pct = lambda key: round(100 * sum(team.get(key, 0) for team in teams) / max(alive, 1), 3)
+        return {"matches": len(rows), "natural_finishes": sum(not row["result"]["time_up"] for row in rows),
+                "flag_pickups": sum(team["flag_pickups"] for team in teams),
+                "objective_score": sum(team["objective_score"] for team in teams),
+                "base_pct": pct("home_ticks"), "attack_pct": pct("attack_ticks"),
+                "low_progress_per_1000_bot_seconds": round(1000 * sum(team["low_progress_seconds"] for team in teams) / max(seconds, 1), 3)}
+    groups = {"all": pairs}
+    for old, new in pairs:
+        groups.setdefault(new["goal"], []).append((old, new))
+    summary = {key: {"before": metrics([old for old, _ in rows]),
+                     "after": metrics([new for _, new in rows])} for key, rows in sorted(groups.items())}
+    lines = ["# Paired bot comparison", "", f"Matched completed scenarios: {len(pairs)}.", "",
+             "Each pair uses the same map bytes, seed, mode, difficulty, bot preset, team-size limit and match limit.",
+             "Only completed pairs are compared. Low-progress time is normalized by live bot time; it can include legitimate turning or combat.", "",
+             "| Mode | Matches | Natural finishes before / after | Flags before / after | Objective points before / after | Base % before / after | Attack % before / after | Low-progress seconds per 1,000 bot-seconds before / after |",
+             "|---|---:|---:|---:|---:|---:|---:|---:|"]
+    for key, values in summary.items():
+        old, new = values["before"], values["after"]
+        pair = lambda field: f"{old[field]} / {new[field]}"
+        lines.append(f"| {key} | {new['matches']} | {pair('natural_finishes')} | {pair('flag_pickups')} | "
+                     f"{pair('objective_score')} | {pair('base_pct')} | {pair('attack_pct')} | {pair('low_progress_per_1000_bot_seconds')} |")
+    lines += ["", "Differences in self-play are evidence to inspect, not proof that a strategy is better against human players.", ""]
+    (folder / "comparison.md").write_text("\n".join(lines))
+    (folder / "comparison.json").write_text(json.dumps(summary, indent=2) + "\n")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--baseline", type=Path, help="repeat completed scenarios from a prior results directory and compare")
     parser.add_argument("--engine", type=Path, required=True, help="freshly built ofp_match")
     parser.add_argument("--hours", type=float, default=8)
-    parser.add_argument("--matches", type=int, default=0, help="stop after this many; 0 uses the time budget")
+    parser.add_argument("--matches", type=int, default=0, help="stop after this many; 0 uses the time budget, or all completed baseline scenarios")
     parser.add_argument("--jobs", type=int, default=2, choices=range(1, 9))
     parser.add_argument("--minutes", type=int, default=20, choices=range(1, 31), help="simulated match limit")
     parser.add_argument("--timeout", type=float, default=180, help="wall seconds allowed per match")
@@ -126,9 +201,24 @@ def main(argv=None):
         parser.error("invalid time, match or replay limit")
     if not args.engine.is_file() or not os.access(args.engine, os.X_OK):
         parser.error("--engine must be an executable ofp_match")
-    maps = args.maps or sorted([*(ROOT / "data/maps").glob("*.ofpmap"), *(ROOT / "data/maps/classic").glob("*.ofpmap")])
-    scenarios = [(path.resolve(), goal, profile, level) for path in maps for goal in map_goals(path)
-                 for level in args.levels for profile in args.profiles]
+    baseline = None
+    if args.baseline:
+        try:
+            baseline_folder, baseline = baseline_plan(args.baseline)
+        except (OSError, ValueError, KeyError, TypeError, IndexError) as error:
+            parser.error("invalid baseline: " + str(error))
+        if args.maps:
+            parser.error("--map cannot be combined with --baseline")
+    if baseline:
+        # A baseline's numeric settings and snapshotted maps override scenario defaults.
+        if args.matches:
+            baseline = baseline[:args.matches]
+        scenarios = [(path, row["goal"], row["profile"], row["level"]) for row, path, _, _ in baseline]
+        args.matches = len(scenarios)
+    else:
+        maps = args.maps or sorted([*(ROOT / "data/maps").glob("*.ofpmap"), *(ROOT / "data/maps/classic").glob("*.ofpmap")])
+        scenarios = [(path.resolve(), goal, profile, level) for path in maps for goal in map_goals(path)
+                     for level in args.levels for profile in args.profiles]
     if not scenarios:
         parser.error("no supported maps/modes selected")
     default_base = Path.home() / "Development/builds/OpenFirePower/AI"
@@ -143,10 +233,14 @@ def main(argv=None):
             target = folder / "maps" / (digest(path)[:12] + "-" + path.name)
             shutil.copy2(path, target)
             copies[path] = target
+    map_names = {path: row["map"] for row, path, _, _ in baseline} if baseline else {}
     manifest = {"schema": 1, "started": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "engine_sha256": digest(engine),
                 "arguments": {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items() if k != "maps"},
-                "maps": [{"source": str(p), "snapshot": str(c.relative_to(folder)), "sha256": digest(c)} for p, c in copies.items()],
+                "maps": [{"source": str(p), "name": map_names.get(p, p.name), "snapshot": str(c.relative_to(folder)), "sha256": digest(c)} for p, c in copies.items()],
                 "scenarios_per_seed": len(scenarios)}
+    if baseline:
+        manifest["baseline"] = str(baseline_folder)
+        manifest["scenario_settings"] = "from matched baseline records"
     try:
         manifest["commit"] = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
         manifest["working_tree_changed"] = bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT))
@@ -163,10 +257,18 @@ def main(argv=None):
     def play(index):
         path, goal, profile, level = scenarios[index % len(scenarios)]
         seed = 7919 * (index // len(scenarios) + 1)
+        side, minutes = args.side, args.minutes
+        if baseline:
+            old, _, side, minutes = baseline[index]
+            seed = old["seed"]
         name = f"match-{index + 1:06d}"
         cmd = [str(engine), "evaluate", "--map", str(copies[path]), "--goal", goal,
-               "--profile", profile, "--level", level, "--seed", str(seed), "--side", str(args.side), "--minutes", str(args.minutes)]
+               "--profile", profile, "--level", level, "--seed", str(seed), "--side", str(side), "--minutes", str(minutes)]
         row = {"id": name, "map": path.name, "goal": goal, "profile": profile, "level": level, "seed": seed, "command": cmd}
+        if baseline:
+            row["baseline_id"] = old["id"]
+            row["map"] = old["map"]
+        row["map_sha256"] = digest(copies[path])
         if index < args.replays:
             row["replay"] = f"replays/{name}.ofprep"
             cmd.extend(["--out", str(folder / row["replay"])])
@@ -204,7 +306,8 @@ def main(argv=None):
             row.pop("replay")
         return row
 
-    print(f"Bot tournament: {len(scenarios)} scenarios per seed, at most {args.hours:g} hours.\nResults: {folder}", flush=True)
+    scenario_label = "paired scenarios" if baseline else "scenarios per seed"
+    print(f"Bot tournament: {len(scenarios)} {scenario_label}, at most {args.hours:g} hours.\nResults: {folder}", flush=True)
     try:
         with (folder / "results.jsonl").open("a", buffering=1) as stream, concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as pool:
             pending = set(); index = 0; next_report = time.monotonic()
@@ -230,6 +333,8 @@ def main(argv=None):
         for sig, handler in previous.items():
             signal.signal(sig, handler)
         report(folder, records)
+        if baseline:
+            comparison(folder, records, baseline)
     print(f"Saved {folder / 'report.md'}", flush=True)
     return int(any(r["status"] in {"error", "timeout"} for r in records))
 

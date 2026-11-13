@@ -20,6 +20,7 @@
         r.players[+m[1]] = { cls: +m[2], team: +m[3], steer: +m[4], bot: +m[5], name: m[6] ? m[6].replace(/_/g, ' ') : '' };
       } else if ((m = l.match(/^time_limit=(\d+) rule=(\d+)/))) { r.time_limit = +m[1]; r.rule = +m[2]; }
       else if ((m = l.match(/^weather=(\d+)/))) r.weather = +m[1];
+      else if ((m = l.match(/^arena_spawns=(\d+)/))) r.arena_spawns = +m[1] === 1;
       else if ((m = l.match(/^classic_clear=(\d+)/))) r.classic_clear = +m[1] === 1;
       else if ((m = l.match(/^world_rules=1 lives=(\d+)/))) { r.world_rules = 1; r.lives = +m[1]; }
       else if ((m = l.match(/^relaxed_pace=(\d+)/))) r.relaxed_pace = +m[1];
@@ -69,7 +70,7 @@
       mem().set(bytes, map);
     }
     this.args = [rep.seed | 0, rep.biome, rep.time, rep.garages, rep.versus, rep.ai, rep.nplayers, per, rep.time_limit, rep.rule, rep.weather, map, rep.extras | 0, rep.map_size | 0, rep.tanks | 0, rep.bot_commands | 0, rep.classic_clear ? 1 : 0];
-    this.args.push(rep.world_rules | 0, rep.lives | 0, rep.relaxed_pace | 0, rep.rocket_tanks | 0, rep.leaders | 0, rep.surface_rules | 0, rep.powerups | 0);
+    this.args.push(rep.world_rules | 0, rep.lives | 0, rep.relaxed_pace | 0, rep.rocket_tanks | 0, rep.leaders | 0, rep.surface_rules | 0, rep.powerups | 0, rep.arena_spawns ? 1 : 0);
     this.inbuf = x.ofp_alloc(10);                  // MAX_TANKS in the browser core
     this.restart();
   }

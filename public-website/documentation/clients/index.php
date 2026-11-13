@@ -63,9 +63,9 @@ documentation_start('clients');
 <p>Each player can use a joystick or CD32 pad on their assigned port. <strong>Settings → Controls</strong> can swap the ports or combine keys and joystick input.</p>
 <div class="control-grid">
   <figure class="control-card">
-    <a href="/assets/img/controls/joystick-amiga.svg" aria-label="Open the Amiga joystick illustration at full size"><img src="/assets/img/controls/joystick-amiga.svg" width="1000" height="720" alt="Redrawn classic Amiga joystick with a red ball-top stick and red fire buttons." loading="lazy"></a>
-    <figcaption><h4>Classic joystick</h4><dl class="control-bindings numbered"><div><dt><span>1</span> Move / navigate</dt><dd>Joystick directions</dd></div><div><dt><span>2</span> Fire / select</dt><dd>Fire button</dd></div></dl>
-    <p class="control-note">On a conventional single-button joystick, both red buttons send Fire. For mines and menu Back, enable keys + joystick and use Player 1's Alt key or Player 2's E key. A supported independent second button can also lay mines.</p></figcaption>
+    <a href="/assets/img/controls/joystick-amiga-tac2.png?v=2" aria-label="Open the TAC-2 Amiga joystick illustration at full size"><img src="/assets/img/controls/joystick-amiga-tac2.png?v=2" width="1000" height="720" alt="Illustrated TAC-2 Amiga joystick with a black ball top, silver shaft, two aligned orange fire buttons, no cord and external control labels." loading="lazy"></a>
+    <figcaption><h4>TAC-2 joystick</h4><dl class="control-bindings numbered"><div><dt><span>1</span> Move / navigate</dt><dd>Joystick directions</dd></div><div><dt><span>2</span> Fire / select</dt><dd>Fire button</dd></div></dl>
+    <p class="control-note">On the TAC-2, both orange buttons send Fire. For mines and menu Back, enable keys + joystick and use Player 1's Alt key or Player 2's E key. A supported independent second button can also lay mines.</p></figcaption>
   </figure>
   <figure class="control-card">
     <a href="/assets/img/controls/controller-cd32.svg" aria-label="Open the CD32 controller illustration at full size"><img src="/assets/img/controls/controller-cd32.svg" width="1000" height="720" alt="Redrawn Amiga CD32 gamepad with D-pad, four coloured action buttons, Play and shoulder buttons." loading="lazy"></a>

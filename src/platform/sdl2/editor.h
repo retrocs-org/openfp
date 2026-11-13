@@ -35,7 +35,7 @@ typedef struct {
     int       check_row, check_scroll;
     int       modes;                 /* L: the modes it's made for (ED_MODES' index; 0: it doesn't say) */
     int       menu, msel, confirm, confirm_yes, open_index;
-    int       option_world, option_weather, option_time, option_size, option_mode, option_players;
+    int       option_world, option_weather, option_time, option_music, option_size, option_mode, option_players;
     int       option_auto_mode;
     int       category, first_tool;
     int       overview, overview_x, overview_y, area_team, area_keyboard;

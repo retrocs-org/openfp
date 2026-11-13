@@ -28,11 +28,39 @@ Iwan Gabovitch. [Composer's page](https://www.jamendo.com/artist/560/gregoire-lo
 | Classic | `classic.mp3` | [Shattered Reality – Epic Orchestral Dubstep](https://opengameart.org/content/shattered-reality-epic-orchestral-dubstep) | TheMightyRager | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) |
 | Moon Base | `moon.ogg` | [Sci-Fi Ambient – Crashed Ship](https://opengameart.org/content/sci-fi-ambient-crashed-ship) | Ted Kerr (Wolfgang_) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
 | Winter | `winter.ogg` | [Cold Grounds](https://opengameart.org/content/cold-grounds) | Anipatok | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| Winter (alternate) | `snow-theme.ogg` | [Through the Snow (Snow Theme)](https://opengameart.org/content/snow-theme) | [Cleyton Kauffman](https://soundcloud.com/cleytonkauffman) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | Desert | `desert.mp3` | [Desert Wasteland](https://opengameart.org/content/desert-wasteland) | tcarisland | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
 | Jungle | `jungle.mp3` | [Chill Jungle Ambient](https://opengameart.org/content/chill-jungle-ambient) | Tausdei | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
 | Swamp | `swamp.ogg` | [Swamp Environment Audio](https://opengameart.org/content/swamp-environment-audio) | LokiF | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | Volcano | `volcanic.wav` | [Entering the Volcano (Ambience of a Fallen Age)](https://opengameart.org/content/ambience-of-a-fallen-age) | Umplix | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
 | Wasteland | `wasteland.mp3` | [Space Graveyard – Ambient Track](https://opengameart.org/content/space-graveyard-ambient-track) | TinyWorlds | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| Wasteland (alternate) | `cannon-tube.ogg` | [Cannon Tube](https://opengameart.org/content/cannon-tube) | [Gundatsch](https://soundcloud.com/gundatsch) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
+| Moon Base (alternate) | `space-atmosphere.mp3` | [Space Atmosphere](https://opengameart.org/content/space-atmospere) | [Alexandr Zhelanov](https://soundcloud.com/alexandr-zhelanov) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
+| Wasteland (alternate) | `new-beginning.ogg` | [A New Beginning](https://opengameart.org/content/new-beginning) | [remaxim](https://opengameart.org/users/remaxim) | [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) |
+| Desert (alternate) | `lost-in-the-desert.mp3` | [Lost in the Desert](https://opengameart.org/content/lost-in-the-desert) | [Eldritch Grim](https://opengameart.org/content/lost-in-the-desert) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| Desert (alternate) | `desert-of-dreams-mix.ogg` | [Caryil_The_Desert_of_Dreams & chill_jungle_ambient (Tausdei vs Insydnis remixed)](https://opengameart.org/content/caryilthedesertofdreams-chilljungleambient-tausdei-vs-insydnis-remixed) | [Insydnis / Tausdei / glitchart](https://opengameart.org/content/caryilthedesertofdreams-chilljungleambient-tausdei-vs-insydnis-remixed) | [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) |
+| Jungle (alternate) | `urban-jungle-2061.mp3` | [Urban Jungle 2061](https://opengameart.org/content/urban-jungle-2061) | [Eric Matyas / Soundimage.org](https://soundimage.org/) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| Jungle (alternate) | `jungle-pro-sensory.wav` | [Jungle](https://opengameart.org/content/jungle-0) | [Alex McCulloch (Pro Sensory)](https://prosensory.blogspot.com/) | [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/) |
+| Volcano (alternate) | `iron-wasteland.ogg` | [Iron Wasteland](https://opengameart.org/content/iron-wasteland) | [Alexandr Zhelanov](https://soundcloud.com/alexandr-zhelanov) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+
+Cannon Tube's original and medium loop are retained. Its Amiga adaptation uses
+a 40-second excerpt of the medium loop, downsampled, normalized and crossfaded.
+Through the Snow retains its complete seamless loop, downsampled and normalized
+for AmigaOS. Existing maps keep their original world track unless changed.
+
+The additional Moon Base, Wasteland, Desert, Jungle and Volcano tracks keep their
+original desktop files. Their Amiga versions use approximately 40-second excerpts,
+downsampled, normalized and crossfaded; they retain the licences shown above.
+
+**Desert of Dreams Mix** is glitchart's first remix of
+[Caryil_The_Desert_of_Dreams](https://opengameart.org/content/the-desert-of-dreams)
+by **Insydnis** and [chill_jungle_ambient](https://opengameart.org/content/chill-jungle-ambient)
+by **Tausdei**, both CC BY 3.0. The later rhythm-game remix is not included.
+
+**Urban Jungle 2061** by **Eric Matyas — Soundimage.org** follows the author's
+explicit CC BY 4.0 attribution notice on its download page (the page's licence
+selector also lists CC BY 3.0). **Jungle** credits **Alex McCulloch (Pro Sensory)**,
+as requested by its author.
 
 ## Credits music and art references
 

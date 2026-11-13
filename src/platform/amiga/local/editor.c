@@ -27,17 +27,17 @@ static int ed_test_cam_x, ed_test_cam_y;
 static uint8_t ed_pressed[128];
 static InputBits ed_joy, ed_test_joy;
 enum { ED_MAIN, ED_FILE, ED_OPTIONS, ED_NETWORK };
-enum { ED_OPEN, ED_SAVE, ED_RANDOM, ED_RESET, ED_WORLD, ED_WEATHER, ED_TIME, ED_MAP_SIZE,
+enum { ED_OPEN, ED_SAVE, ED_RANDOM, ED_RESET, ED_WORLD, ED_WEATHER, ED_TIME, ED_MUSIC, ED_MAP_SIZE,
        ED_GAME_MODE, ED_PLAYERS, ED_APPLY, ED_UPLOAD, ED_TEST, ED_VALIDATE, ED_RESUME, ED_EXIT, ED_BACK, ED_REPLACE_SAVE,
        ED_SHOW_FILE, ED_SHOW_OPTIONS, ED_SHOW_NETWORK };
-static const int ed_actions[][8] = {
+static const int ed_actions[][9] = {
     { ED_SHOW_FILE, ED_SHOW_OPTIONS, ED_SHOW_NETWORK, ED_TEST, ED_VALIDATE, ED_RESUME, ED_EXIT },
     { ED_OPEN, ED_SAVE, ED_RANDOM, ED_RESET, ED_BACK },
-    { ED_WORLD, ED_WEATHER, ED_TIME, ED_MAP_SIZE, ED_GAME_MODE, ED_PLAYERS, ED_APPLY, ED_BACK },
+    { ED_WORLD, ED_WEATHER, ED_TIME, ED_MUSIC, ED_MAP_SIZE, ED_GAME_MODE, ED_PLAYERS, ED_APPLY, ED_BACK },
     { ED_UPLOAD, ED_BACK }
 };
-static const int ed_rows[] = { 7, 5, 8, 2 };
-static int ed_option_world, ed_option_weather, ed_option_time, ed_option_size, ed_option_mode, ed_option_players;
+static const int ed_rows[] = { 7, 5, 9, 2 };
+static int ed_option_world, ed_option_weather, ed_option_time, ed_option_music, ed_option_size, ed_option_mode, ed_option_players;
 static int ed_option_auto_mode;
 static const char mode_auto_notice[] = "MODE SET TO CAPTURE THE FLAG";
 static uint32_t ed_seed = 7, ed_next_move;
@@ -203,7 +203,7 @@ static int ed_menu_row_enabled(int row)
 static void ed_new(int empty)
 {
     Map *m = &game.map;
-    int i, time = m->time, weather = m->weather;
+    int i, time = m->time, music = m->music, weather = m->weather;
     int players = m->custom_bases ? m->players : 2, mode = m->custom_bases ? m->mode : MAP_MODE_CLASSIC;
     MapDetails details = m->details;
     map_set_next_size(ed_size);
@@ -230,6 +230,7 @@ static void ed_new(int empty)
     map_set_next_size(SIZE_LARGE);
     m->details = details;
     m->time = (uint8_t)time;
+    m->music = (uint8_t)music;
     m->has_weather = ed_weather_allowed();
     m->weather = m->has_weather && weather_allowed((Biome)ed_world, weather) ? (uint8_t)weather : WEATHER_CLEAR;
     ed_x = m->w / 2;
@@ -323,6 +324,7 @@ void editor_start(void)
     memset(&game.map.details, 0, sizeof game.map.details);
     game.map.time = TIME_DAY;
     game.map.weather = WEATHER_CLEAR;
+    game.map.music = 0;
     ed_note[0] = 0;
     ed_new(1);
     ed_saved = 1;
@@ -849,7 +851,7 @@ void editor_mouse(ULONG type, UWORD code, int x, int y)
         return;
     }
     if (ed_menu) {
-        int spacing = ed_page == ED_OPTIONS ? 22 : 24;
+        int spacing = ed_page == ED_OPTIONS ? 19 : 24;
         int row = (y - 44) / spacing;
         if (type != IDCMP_MOUSEBUTTONS || code != SELECTDOWN || x < 20 || x >= 300) return;
         if (ed_confirm >= 0) {
@@ -964,10 +966,10 @@ void editor_toggle_menu(void)
 static void ed_render_menu(void)
 {
     static const char *const headings[] = { "MAP EDITOR", "FILE", "OPTIONS", "NETWORK" };
-    static const char *const names[][8] = {
+    static const char *const names[][9] = {
         { "FILE  >", "OPTIONS  >", "NETWORK  >", "TEST RUN MAP", "VALIDATE MAP", "BACK TO EDITOR", "BACK TO MAIN MENU" },
         { "OPEN", "SAVE", "RANDOM MAP", "ERASE MAP", "BACK" },
-        { "SET WORLD", "SET WEATHER", "SET TIME OF DAY", "SET SIZE", "GAME MODE", "PLAYERS", "APPLY", "BACK" },
+        { "SET WORLD", "SET WEATHER", "SET TIME OF DAY", "SOUNDTRACK", "SET SIZE", "GAME MODE", "PLAYERS", "APPLY", "BACK" },
         { "UPLOAD MAP TO GALLERY", "BACK" }
     };
     int i;
@@ -984,19 +986,20 @@ static void ed_render_menu(void)
         menu_option_row(ed_yes, 163, 299, 135, "CONTINUE", NULL);
     } else {
         char players[8];
-        const char *values[8] = { NULL };
+        const char *values[9] = { NULL };
         if (ed_page == ED_OPTIONS) {
             values[0] = world_names[ed_option_world];
             if (ed_option_weather_allowed()) values[1] = weather_label(ed_option_weather);
             values[2] = time_name(ed_option_time);
-            values[3] = map_size_name[ed_option_size];
-            values[4] = (game.map.custom_bases || ed_option_size != ed_size) ? map_mode_names[ed_option_mode] : "IMPORTED";
+            values[3] = soundtrack_title(soundtrack_for_map(ed_option_world, ed_option_music));
+            values[4] = map_size_name[ed_option_size];
+            values[5] = (game.map.custom_bases || ed_option_size != ed_size) ? map_mode_names[ed_option_mode] : "IMPORTED";
             snprintf(players, sizeof players, "%d", ed_option_players);
-            values[5] = (game.map.custom_bases || ed_option_size != ed_size) ? players : "IMPORTED";
+            values[6] = (game.map.custom_bases || ed_option_size != ed_size) ? players : "IMPORTED";
         }
         label(22, 32, GOLD, headings[ed_page]);
         for (i = 0; i < ed_rows[ed_page]; i++) {
-            int y = 53 + i * (ed_page == ED_OPTIONS ? 22 : 24);
+            int y = 53 + i * (ed_page == ED_OPTIONS ? 19 : 24);
             if (ed_menu_row_enabled(i)) menu_option_row(i == ed_row, 20, 299, y, names[ed_page][i], values[i]);
             else {
                 menu_option_row(0, 20, 299, y, "", NULL);
@@ -1122,6 +1125,7 @@ static void ed_action(int action)
         ed_option_weather = ed_weather_allowed() && weather_allowed((Biome)ed_world, game.map.weather) ?
                             game.map.weather : WEATHER_CLEAR;
         ed_option_time = game.map.time;
+        ed_option_music = game.map.music;
         ed_option_size = ed_size;
         ed_option_mode = game.map.custom_bases ? game.map.mode : MAP_MODE_CLASSIC;
         ed_option_players = game.map.custom_bases ? game.map.players : map_custom_players(ed_size, 2, 0);
@@ -1142,7 +1146,7 @@ static void ed_action(int action)
             break;
         }
         if (ed_option_world != ed_world || ed_option_time != game.map.time ||
-            weather != game.map.weather || ed_option_size != ed_size ||
+            weather != game.map.weather || ed_option_music != game.map.music || ed_option_size != ed_size ||
             (game.map.custom_bases && (ed_option_mode != game.map.mode || ed_option_players != game.map.players))) {
             ed_world = ed_option_world;
             game.map.time = (uint8_t)ed_option_time;
@@ -1156,6 +1160,7 @@ static void ed_action(int action)
                 game.map.players = (uint8_t)ed_option_players;
                 game.map.mode = (uint8_t)ed_option_mode;
             } else ed_prepare_map();
+            game.map.music = (uint8_t)ed_option_music;
             game.map.weather = (uint8_t)weather;
             game.map.has_weather = allow_weather;
             ed_brush = ed_first_brush = 0;
@@ -1208,6 +1213,7 @@ static void ed_option_step(int action, int direction)
     case ED_WORLD: {
         int mode = ed_option_mode;
         ed_option_world = biome_step((Biome)ed_option_world, direction);
+        ed_option_music = 0;
         ed_option_mode = map_editor_mode_for_world(ed_option_mode, (Biome)ed_option_world);
         if (mode != ed_option_mode) ed_option_auto_mode = ed_option_mode == MAP_MODE_FLAG;
         if (!ed_option_weather_allowed() || !weather_allowed((Biome)ed_option_world, ed_option_weather))
@@ -1218,6 +1224,7 @@ static void ed_option_step(int action, int direction)
         if (ed_option_weather_allowed())
             ed_option_weather = weather_step((Biome)ed_option_world, ed_option_weather, direction, 0);
         break;
+    case ED_MUSIC: ed_option_music = soundtrack_step(ed_option_world, ed_option_music, direction); break;
     case ED_TIME: ed_option_time = (ed_option_time + TIME_COUNT + direction) % TIME_COUNT; break;
     case ED_GAME_MODE:
         if (game.map.custom_bases || ed_option_size != ed_size) ed_option_mode = (ed_option_mode + MAP_MODE_COUNT + direction) % MAP_MODE_COUNT;

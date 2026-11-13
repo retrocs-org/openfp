@@ -87,6 +87,24 @@ class EvaluationTests(unittest.TestCase):
             self.assertTrue((output / manifest['maps'][0]['snapshot']).is_file())
             self.assertIn('home_pct', (output / 'matches.csv').read_text())
             self.assertIn('Completed: 2 matches.', (output / 'report.md').read_text())
+            # Baselines supply data only: their recorded executable must never run.
+            for row in rows:
+                row['command'][0] = '/does/not/exist'
+            (output / 'results.jsonl').write_text(''.join(json.dumps(row) + '\n' for row in rows))
+            paired = Path(tmp) / 'paired'
+            subprocess.run([sys.executable, str(ROOT / 'tools/ai_tournament.py'), '--engine', ENGINE,
+                            '--baseline', str(output), '--matches', '2', '--jobs', '2',
+                            '--out', str(paired)], check=True, capture_output=True)
+            self.assertEqual(len(tournament.baseline_plan(paired)[1]), 2)
+            summary = json.loads((paired / 'comparison.json').read_text())
+            self.assertEqual(summary['all']['before'], summary['all']['after'])
+            self.assertEqual(summary['all']['after']['matches'], 2)
+            self.assertIn('Objective points', (paired / 'comparison.md').read_text())
+            snapshot = output / manifest['maps'][0]['snapshot']
+            snapshot.write_text(snapshot.read_text() + '# changed\n')
+            with self.assertRaisesRegex(ValueError, 'changed baseline map'):
+                tournament.baseline_plan(output)
+
 
 
 class ShutdownTests(unittest.TestCase):

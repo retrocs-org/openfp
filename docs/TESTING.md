@@ -85,6 +85,22 @@ A match takes a few seconds on one core; a hundred, ten minutes or so, divided b
 
 ## Bot strategy tournament
 
+Repeat a completed run after a gameplay change with its exact saved maps and seeds:
+
+```sh
+python3 tools/ai_tournament.py --engine build-ai/ofp_match \
+  --baseline /path/to/previous-results --matches 1236 --jobs 4
+```
+
+`--baseline` reuses completed scenarios in match order, including their team-size
+and match-time limits. `--matches` selects a smaller paired sample; omit it to
+repeat every completed scenario. Map hashes are checked before running.
+`comparison.md` and `comparison.json` compare objective points, flag pickups,
+natural finishes, base time, attack time and low-progress time. Compare the same
+sample before drawing conclusions; self-play statistics do not prove strength
+against human players.
+
+
 `tools/ai_tournament.py` plays private, accelerated bot-versus-bot matches and
 saves statistics for strategy work. It does not connect to a public server,
 change the bots or train them automatically. Python 3.9+ is required.

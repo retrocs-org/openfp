@@ -4,6 +4,7 @@
 #include <string.h>
 #include "platform/sdl2/editor.h"
 #include "common/recovery.h"
+#include "common/soundtrack.h"
 #include "platform/sdl2/input.h"
 #include "platform/sdl2/maps.h"
 #include "platform/sdl2/render.h"
@@ -197,13 +198,14 @@ static void make_empty(Editor *e, int size)
 {
     Game *g = e->g;
     Map *m = &g->map;
-    int x, y, time = m->time, weather = m->weather, has_weather = m->has_weather;
+    int x, y, time = m->time, music = m->music, weather = m->weather, has_weather = m->has_weather;
     int players = m->custom_bases ? m->players : 2, mode = m->custom_bases ? m->mode : MAP_MODE_CLASSIC;
     MapDetails details = m->details;
     memset(m, 0, sizeof *m);
     m->details = details;
     map_set_size(m, size);
     m->time = (uint8_t)time;
+    m->music = (uint8_t)music;
     m->weather = (uint8_t)weather;
     m->has_weather = (uint8_t)has_weather;
     for (y = 0; y < m->h; y++)
@@ -523,19 +525,19 @@ int editor_check(Editor *e)
 
 enum { E_CLOSED, E_MAIN, E_FILE, E_OPTIONS, E_NETWORK, E_OPEN };
 enum { E_SHOW_FILE = 1, E_SHOW_OPTIONS, E_SHOW_NETWORK, E_SHOW_OPEN, E_BACK, E_RESUME, E_EXIT, E_APPLY, E_LOAD,
-       E_WORLD, E_WEATHER, E_TIME, E_SIZE, E_MODE, E_PLAYERS };
+       E_WORLD, E_WEATHER, E_TIME, E_MUSIC, E_SIZE, E_MODE, E_PLAYERS };
 enum { MENU_X = 42, MENU_Y = 25, MENU_W = 300, MENU_TOP = 52, MENU_ROW = 15, OPEN_VISIBLE = 8 };
-static const struct { const char *name; int action; } menu_rows[][8] = {
+static const struct { const char *name; int action; } menu_rows[][9] = {
     [E_MAIN] = { { "FILE  >", E_SHOW_FILE }, { "OPTIONS  >", E_SHOW_OPTIONS }, { "NETWORK  >", E_SHOW_NETWORK },
                  { "TEST RUN MAP", SDLK_F9 }, { "VALIDATE MAP", SDLK_F7 }, { "BACK TO EDITOR", E_RESUME }, { "BACK TO MAIN MENU", E_EXIT } },
     [E_FILE] = { { "OPEN  >", E_SHOW_OPEN }, { "SAVE", SDLK_F2 }, { "RANDOM MAP", SDLK_g },
                  { "ERASE MAP", SDLK_c }, { "BACK", E_BACK } },
     [E_OPTIONS] = { { "SET WORLD", E_WORLD }, { "SET WEATHER", E_WEATHER }, { "SET TIME OF DAY", E_TIME },
-                    { "SET SIZE", E_SIZE }, { "GAME MODE", E_MODE }, { "PLAYERS", E_PLAYERS },
+                    { "SOUNDTRACK", E_MUSIC }, { "SET SIZE", E_SIZE }, { "GAME MODE", E_MODE }, { "PLAYERS", E_PLAYERS },
                     { "APPLY", E_APPLY }, { "BACK", E_BACK } },
     [E_NETWORK] = { { "UPLOAD MAP TO GALLERY", SDLK_F8 }, { "BACK", E_BACK } }
 };
-static const int menu_counts[] = { 0, 7, 5, 8, 2 };
+static const int menu_counts[] = { 0, 7, 5, 9, 2 };
 static MapEntry open_maps[MAPS_MAX];
 static int open_count;
 
@@ -610,6 +612,7 @@ static void option_change(Editor *e, int action, int delta)
     case E_WORLD: {
         int mode = e->option_mode;
         e->option_world = biome_step((Biome)e->option_world, delta);
+        e->option_music = 0;
         e->option_mode = map_editor_mode_for_world(e->option_mode, (Biome)e->option_world);
         if (mode != e->option_mode) e->option_auto_mode = e->option_mode == MAP_MODE_FLAG;
         if (!option_weather_allowed(e) ||
@@ -624,6 +627,7 @@ static void option_change(Editor *e, int action, int delta)
             e->option_weather = next == WEATHER_COUNT ? 0 : next + 1;
         }
         break;
+    case E_MUSIC: e->option_music = soundtrack_step(e->option_world, e->option_music, delta); break;
     case E_TIME: e->option_time = (e->option_time + delta + TIME_COUNT) % TIME_COUNT; break;
     case E_SIZE:
         e->option_size = (e->option_size + delta + MAP_SIZES) % MAP_SIZES;
@@ -660,6 +664,7 @@ static void apply_options(Editor *e)
         m->mode = (uint8_t)e->option_mode;
         m->players = (uint8_t)e->option_players;
     }
+    m->music = (uint8_t)e->option_music;
     map_normalize_surfaces(m, (Biome)e->g->biome, e->g->biome == BIOME_CLASSIC || (m->custom_bases && m->mode == MAP_MODE_CLASSIC));
     e->g->weather = m->weather;
     switch_category(e, 0);
@@ -738,6 +743,7 @@ static int editor_menu_input(Editor *e, InputBits pressed, int key, int mx, int 
     case E_SHOW_OPTIONS:
         e->option_auto_mode = 0;
         e->option_world = e->g->biome; e->option_time = m->time;
+        e->option_music = m->music;
         e->option_weather = editor_weather_allowed(e) && m->has_weather &&
                             weather_allowed((Biome)e->g->biome, m->weather) ? m->weather + 1 : 0;
         e->option_size = m->size;
@@ -1072,6 +1078,7 @@ int editor_update(Editor *e, InputBits nav, int key, int mx, int my, int buttons
     case SDLK_g: {
         int players = e->g->map.custom_bases ? e->g->map.players : 2;
         int mode = e->g->map.custom_bases ? e->g->map.mode : MAP_MODE_CLASSIC;
+        int music = e->g->map.music;
         MapDetails details = e->g->map.details;
         undo_push(e);                            /* a fresh random map to start from (this size) */
         e->seed = e->seed * 1103515245u + 12345u;
@@ -1081,6 +1088,7 @@ int editor_update(Editor *e, InputBits nav, int key, int mx, int my, int buttons
         e->g->enhanced_rules = e->g->biome != BIOME_CLASSIC && mode != MAP_MODE_CLASSIC;
         game_prepare_surfaces(e->g, e->seed, 1);
         e->g->map.details = details;
+        e->g->map.music = (uint8_t)music;
         map_set_next_size(SIZE_LARGE);
         tidy(e->g);
         switch_category(e, 0);
@@ -1100,6 +1108,7 @@ int editor_update(Editor *e, InputBits nav, int key, int mx, int my, int buttons
         int mode = m->mode;
         undo_push(e);
         e->g->biome = (uint8_t)biome_step((Biome)e->g->biome, 1);
+        m->music = 0;
         map_normalize_surfaces(&e->g->map, (Biome)e->g->biome, e->g->biome == BIOME_CLASSIC || (e->g->map.custom_bases && e->g->map.mode == MAP_MODE_CLASSIC));
         switch_category(e, 0);
         if (m->custom_bases)
@@ -1270,7 +1279,7 @@ static void editor_menu_draw(SDL_Renderer *r, const HudColors *c, const Editor *
     static const char *const titles[] = { "", "MAP EDITOR", "FILE", "OPTIONS", "NETWORK", "OPEN MAP" };
     int i, n = e->menu == E_OPEN ? open_count + 1 : menu_counts[e->menu];
     int first = e->menu == E_OPEN && e->msel >= OPEN_VISIBLE ? e->msel - OPEN_VISIBLE + 1 : 0;
-    ui_panel(r, MENU_X, MENU_Y, MENU_W, 166);
+    ui_panel(r, MENU_X, MENU_Y, MENU_W, e->menu == E_OPTIONS ? 181 : 166);
     ui_text_bold(r, MENU_X + 11, 34, 1, c->value, e->confirm ? "CONFIRM" : titles[e->menu]);
     if (e->confirm) {
         const char *msg = e->confirm == E_APPLY ? "RESIZING ERASES THE CURRENT MAP." :
@@ -1284,7 +1293,7 @@ static void editor_menu_draw(SDL_Renderer *r, const HudColors *c, const Editor *
         }
         return;
     }
-    for (i = first; i < n && i < first + OPEN_VISIBLE; i++) {
+    for (i = first; i < n && i < first + (e->menu == E_OPEN ? OPEN_VISIBLE : n); i++) {
         int row = i - first, y = MENU_TOP + row * MENU_ROW;
         int enabled = menu_row_enabled(e, i), on = enabled && e->msel == i;
         const char *name, *value = NULL;
@@ -1301,6 +1310,7 @@ static void editor_menu_draw(SDL_Renderer *r, const HudColors *c, const Editor *
                 if (enabled) value = e->option_weather ? weather_label(e->option_weather - 1) : "ANY";
                 break;
             case E_TIME: value = time_name(e->option_time); break;
+            case E_MUSIC: value = soundtrack_title(soundtrack_for_map(e->option_world, e->option_music)); break;
             case E_SIZE: value = map_size_name[e->option_size]; break;
             case E_MODE: value = (e->g->map.custom_bases || e->option_size != e->g->map.size) ? map_mode_names[e->option_mode] : "IMPORTED"; break;
             case E_PLAYERS:
@@ -1315,9 +1325,9 @@ static void editor_menu_draw(SDL_Renderer *r, const HudColors *c, const Editor *
     }
     if (e->menu == E_OPTIONS && e->option_auto_mode && !e->msg_t &&
         (e->g->map.custom_bases || e->option_size != e->g->map.size))
-        ui_text(r, MENU_X + 11, 177, 1, c->value, mode_auto_notice);
+        ui_text(r, MENU_X + 11, 198, 1, c->value, mode_auto_notice);
     else
-        ui_text(r, MENU_X + 11, 177, 1, e->msg_t ? c->value : UI_GREY, e->msg_t ? e->msg : "FIRE SELECT   MINE / ESC BACK");
+        ui_text(r, MENU_X + 11, e->menu == E_OPTIONS ? 198 : 177, 1, e->msg_t ? c->value : UI_GREY, e->msg_t ? e->msg : "FIRE SELECT   MINE / ESC BACK");
 }
 
 static void details_draw(SDL_Renderer *r, const HudColors *c, Editor *e)

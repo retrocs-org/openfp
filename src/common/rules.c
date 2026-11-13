@@ -67,6 +67,15 @@ uint32_t net_rules(void)
             h = (h ^ play(&ms, NULL, 500)) * 16777619u;
         }
     }
+    /* A full arena with grouped teams also exercises the initial spawn assignment. */
+    memset(&ms, 0, sizeof ms);
+    ms.seed = 7919; ms.biome = BIOME_MOON; ms.camp_garages = 4;
+    ms.players = MATCH_PLAYERS; ms.versus = 1; ms.extras = EXTRA_TDM;
+    for (int p = 0; p < MATCH_PLAYERS; p++) {
+        ms.cls[p] = TANK_MEDIUM;
+        ms.team[p] = (uint8_t)(p >= MATCH_PLAYERS / 2);
+    }
+    h = (h ^ play(&ms, NULL, 100)) * 16777619u;
     /* the newer worlds' own rules: the swamp's mud, the moon's slide */
     {
         static const uint8_t worlds[3] = { BIOME_SWAMP, BIOME_MOON, BIOME_VOLCANIC };

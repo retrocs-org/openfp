@@ -41,9 +41,10 @@ through a dedicated server that runs the match and referees it.**
 * The dedicated server runs the online computer opponents in `ai.c`, including
   pathfinding. Clients receive their commands with the player inputs for each tick.
 
-The current wire protocol is 38, with world-specific vehicles, configurable tank allowances, slippery surfaces and power-ups. All clients and dedicated servers must be updated together; older protocols are refused with an explanation. New online recordings use
+The current wire protocol is 39, with team-order-independent arena starts, world-specific vehicles, configurable tank allowances, slippery surfaces and power-ups. All clients and dedicated servers must be updated together; older protocols are refused with an explanation. New online recordings use
 `OFPREPLAY 2` and store the official commands for both players and bots. The game and
-web viewer still play version 1 replays with the original local AI behavior.
+web viewer still play version 1 replays with the original local AI behavior. Recordings
+without `arena_spawns=1` retain the previous arena starting positions.
 
 ## How a match runs
 
@@ -551,7 +552,7 @@ on macOS (clang) that's the check that a Mac and a Linux server agree.
 ### Versions
 
 A game and a server talk when each one's protocol is at least the other's *oldest*
-(`NET_PROTOCOL`, `NET_PROTOCOL_OLDEST` in `src/common/net.h`; both 38 in this build). From
+(`NET_PROTOCOL`, `NET_PROTOCOL_OLDEST` in `src/common/net.h`; both 39 in this build). From
 protocol 8 on, a change that only adds fields at the end of a message keeps the oldest:
 older builds read what they know and skip the rest. Only a change that breaks a message
 raises it. When they can't talk, the server says so in a BYE every build can read (its

@@ -19,7 +19,7 @@ EXPORT("ofp_free")  void ofp_free(void *p) { free(p); }
 EXPORT("ofp_start")
 int ofp_start(int seed, int biome, int time, int garages, int versus, int ai, int players, const unsigned char *per,
               int time_limit, int rule, int weather, const char *map, int extras, int map_size, int tanks, int bot_commands,
-              int classic_clear, int world_rules, int lives, int relaxed_pace, int rocket_tanks, int leaders, int surface_rules, int powerups)
+              int classic_clear, int world_rules, int lives, int relaxed_pace, int rocket_tanks, int leaders, int surface_rules, int powerups, int arena_spawns)
 {
     MatchSetup ms;
     int p;
@@ -35,6 +35,7 @@ int ofp_start(int seed, int biome, int time, int garages, int versus, int ai, in
     ms.legacy_weather = classic_clear != 1;
     ms.legacy_rules = world_rules != 1;
     ms.legacy_surfaces = surface_rules != 1;
+    ms.legacy_arena_spawns = arena_spawns != 1;
     ms.no_powerups = surface_rules == 1 && !powerups;
     ms.lives = (uint8_t)lives;
     ms.relaxed_pace = (uint8_t)relaxed_pace;

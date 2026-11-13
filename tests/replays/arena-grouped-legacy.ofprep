@@ -1,0 +1,20 @@
+OFPREPLAY 2
+seed=7919 biome=7 time=0 garages=4 versus=1 ai=0 players=8 tanks=8
+player=0 cls=1 team=0 steer=0 bot=0
+player=1 cls=1 team=0 steer=0 bot=0
+player=2 cls=1 team=0 steer=0 bot=0
+player=3 cls=1 team=0 steer=0 bot=0
+player=4 cls=1 team=1 steer=0 bot=0
+player=5 cls=1 team=1 steer=0 bot=0
+player=6 cls=1 team=1 steer=0 bot=0
+player=7 cls=1 team=1 steer=0 bot=0
+world_rules=1 lives=0
+surface_rules=1 powerups=1
+classic_clear=1
+extras=16
+ticks
+250 0000000000000000
+check 250 0bb271a9
+250 0000000000000000
+check 500 9a4300d4
+end

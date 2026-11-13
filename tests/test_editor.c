@@ -9,6 +9,7 @@
 #include "core/match.h"
 #include "platform/sdl2/maps.h"
 #include "common/recovery.h"
+#include "common/soundtrack.h"
 static Game g; static Editor e; static char buf[400000];
 static void key(int k) { editor_update(&e, 0, k, -1, -1, 0, 0); }
 static void at(int x, int y, int k) { e.cx = x; e.cy = y; key(k); }
@@ -54,7 +55,7 @@ static int check_weather(void)
     for (i = 0; i < 4; i++) click(62, 55);   /* Classic -> Moon -> Winter -> Desert -> Jungle */
     ok &= e.option_world == BIOME_JUNGLE && e.option_mode == MAP_MODE_FLAG && e.option_auto_mode;
     click(62, 70); click(62, 70);           /* Any -> Clear -> Thunderstorm */
-    click(62, 145);
+    click(62, 160);
     ok &= strstr(e.msg, "MODE SET TO CAPTURE THE FLAG") != NULL;
     key(SDLK_ESCAPE);
     ok &= g.biome == BIOME_JUNGLE && g.map.mode == MAP_MODE_FLAG && g.map.has_weather && g.map.weather == WEATHER_STORM;
@@ -64,10 +65,35 @@ static int check_weather(void)
     ok &= e.option_world == BIOME_CLASSIC && e.option_mode == MAP_MODE_FLAG && e.option_weather == 0;
     click(62, 70);
     ok &= e.msel == 0 && e.option_weather == 0;
-    click(62, 145);
+    click(62, 160);
     key(SDLK_ESCAPE);
     ok &= g.biome == BIOME_CLASSIC && !g.map.has_weather && g.map.weather == WEATHER_CLEAR;
     printf("editor world and weather controls: %s\n", ok ? "ok" : "FAILED");
+    return ok;
+}
+
+static int check_soundtrack(void)
+{
+    int ok;
+    game_init(&g, 77, BIOME_WINTER);
+    mapfile_save(&g.map, g.bases, BIOME_WINTER, "Winter music", buf, sizeof buf);
+    editor_open(&e, &g, buf, NULL, 0, 77, BIOME_WINTER);
+    key(SDLK_ESCAPE); click(62, 70); click(62, 100);
+    ok = e.option_music == 1 && g.map.music == 0;
+    press(IN_MINE); click(62, 70);
+    ok &= e.option_music == 0; /* Cancel leaves the map untouched. */
+    click(62, 100); click(62, 160); key(SDLK_ESCAPE);
+    ok &= g.map.music == 1;
+    key(SDLK_c); /* Erasing terrain keeps the chosen soundtrack. */
+    ok &= g.map.music == 1;
+    key(SDLK_ESCAPE); click(62, 70); click(62, 115); click(62, 160);
+    click(242, 119); key(SDLK_ESCAPE); /* Resize also keeps the choice. */
+    ok &= g.map.music == 1;
+    key(SDLK_ESCAPE); click(62, 70); click(62, 55);
+    ok &= e.option_world == BIOME_DESERT && e.option_music == 0;
+    click(62, 160); key(SDLK_ESCAPE);
+    ok &= g.biome == BIOME_DESERT && g.map.music == 0;
+    printf("editor soundtrack choices: %s\n", ok ? "ok" : "FAILED");
     return ok;
 }
 
@@ -122,10 +148,10 @@ static int check_custom(void)
     ok &= !e.checking;
     key(SDLK_ESCAPE);
     click(62, 70);                          /* Options */
-    click(62, 115);                         /* Classic -> Capture the Flag */
-    click(62, 100);                         /* Large -> Huge */
-    click(62, 130);                         /* Huge stays at 8 */
-    click(62, 145);                         /* Apply, then confirm resize */
+    click(62, 130);                         /* Classic -> Capture the Flag */
+    click(62, 115);                         /* Large -> Huge */
+    click(62, 145);                         /* Huge stays at 8 */
+    click(62, 160);                         /* Apply, then confirm resize */
     click(242, 119);
     key(SDLK_ESCAPE);
     ok &= g.map.size == SIZE_HUGE && g.map.players == 8 && g.map.mode == MAP_MODE_FLAG;
@@ -164,13 +190,13 @@ static int check_custom(void)
     ok &= map_custom_count(&g.map, TEAM_ENEMY, ST_FLAGHOUSE) == 1;
     key(SDLK_ESCAPE);
     click(62, 70);
-    click(62, 115);                         /* Flag -> Conquest */
-    click(62, 145);
+    click(62, 130);                         /* Flag -> Conquest */
+    click(62, 160);
     ok &= g.map.mode == MAP_MODE_FLAG;      /* Existing flag blocks the mode change */
     key(SDLK_ESCAPE); key(SDLK_ESCAPE);
     key(SDLK_DELETE);
     key(SDLK_ESCAPE);
-    click(62, 70); click(62, 115); click(62, 145); key(SDLK_ESCAPE);
+    click(62, 70); click(62, 130); click(62, 160); key(SDLK_ESCAPE);
     ok &= g.map.mode == MAP_MODE_CONQUEST;
     for (i = 0; i < 16; i++) key(SDLK_e);    /* MG nest (no flag tool in Conquest) */
     e.cx = 76; e.cy = 76; press(IN_FIRE);
@@ -242,6 +268,7 @@ int main(void) {
     int surfaces_ok=check_surfaces();
     int ok = 1, k; FILE *f; size_t n;
     ok &= check_weather();
+    ok &= check_soundtrack();
     ok &= check_return_and_jump();
     ok &= check_custom();
     game_init(&g, 77, BIOME_DESERT);
@@ -281,7 +308,7 @@ int main(void) {
         b0 = g.biome;
         press(IN_DOWN); press(IN_FIRE);             /* Options */
         press(IN_RIGHT);                            /* World */
-        click(62, 145);                              /* Apply */
+        click(62, 160);                              /* Apply */
         printf("WORLD, right: %d -> %d\n", b0, g.biome); ok &= g.biome != b0;
         press(IN_MINE);
         printf("B: the menu %s\n", e.menu ? "STILL OPEN" : "closed"); ok &= !e.menu;

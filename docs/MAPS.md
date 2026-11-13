@@ -79,7 +79,7 @@ press Fire, to jump there.
 | Pan or erase | Right-drag to pan, right-click to erase | Same |
 | Editor menu | Escape | Escape or Player 1 Mine |
 
-Use **Options** to set the world, weather, time, size, game mode, and
+Use **Options** to set the world, weather, time, soundtrack, size, game mode, and
 player count. Small supports 2 players, Medium 2 or 4, Large 4 or 6, and
 Huge 8. A new Large map defaults to 4 players. Resizing erases the draft
 after confirmation. World, weather, and time changes preserve the layout.
@@ -87,6 +87,10 @@ Choosing an enhanced world while the draft uses Classic rules switches it to
 Capture the Flag. The Classic world and Classic rules both disable weather.
 The toolbar's **Time** and **Weather** buttons control the editor previews.
 The saved map keeps the settings from **Options**.
+**Soundtrack** chooses among the tracks available for that world. Winter offers
+Cold Grounds and Through the Snow; Wasteland offers Space Graveyard and Cannon
+Tube. Changing worlds resets this choice to the new world's default. Music
+choices survive saving, sharing, network play and replay playback.
 
 Open **Set Area**, select **Team 1** or **Team 2**, and drag on the overview
 to draw an area. Drag inside a rectangle to move it or drag an edge or corner
@@ -142,6 +146,10 @@ end
   insides aren't stored.
 * **Loading is forgiving:** a building that doesn't fit is left out, and
   unknown lines are ignored.
+
+An optional `music=` header selects a track by its stable key: `snow-theme` for
+Winter or `cannon-tube` for Wasteland. Omitting it keeps the world's default.
+An unknown key, or a track belonging to another world, falls back to that default.
 
 Player-built bases use `bases=custom`, `mode=`, `players=`, and one
 `compound=` rectangle per side. Their garages, flag bases and other buildings

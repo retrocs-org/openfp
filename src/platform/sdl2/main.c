@@ -2770,7 +2770,7 @@ int main(int argc, char **argv)
         {   /* the music: the world's tune in a match, the menus' elsewhere */
             int want = -1;
             if (screen == SCREEN_PLAY) {
-                want = (replay_view && rv_speed != 1) || smoke ? -1 : (int)game.biome;
+                want = (replay_view && rv_speed != 1) || smoke ? -1 : soundtrack_for_map(game.biome, game.map.music);
             } else if (screen != SCREEN_EDITOR) want = screen == SCREEN_MENU && menu.page == PAGE_ABOUT ? SOUNDTRACK_CREDITS : MUSIC_MENU;
             music_play(want);
         }

@@ -68,6 +68,7 @@ int replay_save(const Replay *r, const char *path)
         fprintf(f, "player=%d cls=%d team=%d steer=%d bot=%d%s%s\n", p, (int)ms->cls[p], (int)ms->team[p], (int)ms->steer[p], (int)ms->bot[p],
                 nm[0] ? " name=" : "", nm);
     }
+    if (!ms->legacy_arena_spawns) fputs("arena_spawns=1\n", f);
     if (!ms->legacy_rules) fprintf(f, "world_rules=1 lives=%u\n", (unsigned)ms->lives);
     if (!ms->legacy_rules && !ms->legacy_surfaces) fprintf(f, "surface_rules=1 powerups=%u\n", (unsigned)!ms->no_powerups);
     if (ms->time_limit) fprintf(f, "time_limit=%u rule=%u\n", (unsigned)ms->time_limit, (unsigned)ms->time_rule);
@@ -107,6 +108,7 @@ int replay_load(Replay *r, const char *path)
     ms.legacy_weather = 1;
     ms.legacy_rules = 1;
     ms.legacy_surfaces = 1;
+    ms.legacy_arena_spawns = 1;
     if (!f) return -1;
     if (!fgets(line, sizeof line, f)) goto fail;
     if (!strcmp(line, "OFPREPLAY 2\n") || !strcmp(line, "OFPREPLAY 2\r\n")) ms.bot_commands = 1;
@@ -140,6 +142,8 @@ int replay_load(Replay *r, const char *path)
             ms.lives = (uint8_t)(len == 255 || len <= 99 ? len : 5);
         } else if (sscanf(line, "surface_rules=1 powerups=%u", &len) == 1) {
             ms.legacy_surfaces = 0; ms.no_powerups = !len;
+        } else if (sscanf(line, "arena_spawns=%u", &len) == 1) {
+            ms.legacy_arena_spawns = len != 1;
         } else if (sscanf(line, "extras=%u", &len) == 1) {
             ms.extras = (uint8_t)(len & EXTRA_ALL);
         } else if (sscanf(line, "relaxed_pace=%u", &len) == 1) {

@@ -1,8 +1,6 @@
 /* SPDX-License-Identifier: MIT
- * Music: a small synthesiser that plays a song for each world, made up as it goes from
- * a few lines of data (tempo, key, chords, and how the bass, the tune and the drums go).
- * No samples, no files: four voices (bass, lead, pad, drums) mixed into the sound
- * device's stream, a few dozen operations a sample. Loops for ever, 16 bars a turn.
+ * On-demand sampled music, tracker overrides and a small synthesizer fallback.
+ * File decoding and reclamation run outside the audio callback.
  */
 #include <SDL.h>
 #include <math.h>
@@ -33,7 +31,7 @@ static const int PHRYGIAN[7] = { 0, 1, 4, 5, 7, 8, 10 };   /* (with a raised thi
 static const int DORIAN[7]   = { 0, 2, 3, 5, 7, 9, 10 };
 static const int AEOLIAN[7]  = { 0, 2, 3, 5, 7, 8, 10 };
 
-static const Song songs[] = {
+static const Song songs[MUSIC_SONGS] = {
     /* classic: a march */
     { 112, 45, MINOR,    { 0, 5, 3, 4, 0, 5, 6, 4 },
       "0-0-4-0-0-0-4-7-", "0-2-4-=-2-1-0---4-4-5-4-2---0---", "k-h-s-hkk-h-s-hh", 0, 1 },
@@ -78,13 +76,6 @@ static int scale_note(const Song *s, int degree)   /* scale degree (any) to MIDI
     return s->root + oct * 12 + s->scale[d];
 }
 
-void music_play(int which)
-{
-    SDL_AtomicSet(&want_song, which >= 0 && which < MUSIC_SONGS ? which : -1);
-}
-
-void music_volume(int level) { SDL_AtomicSet(&want_volume, volume_clamp(level)); }
-
 /* a new step of the song: what starts now */
 static void step(const Song *s, int stp)
 {
@@ -113,47 +104,72 @@ static void step(const Song *s, int stp)
 /* ---- tracker modules: data/music/<song>.mod (.xm, .s3m, .it), or your own in the music
  * folder beside settings.ini; libxmp-lite plays them. A song without one: the synthesiser. */
 static const char *const song_file[MUSIC_SONGS] = {
-    "classic", "desert", "jungle", "winter", "scifi", "volcanic", "wasteland", "moon", "swamp", "menu", "credits"
+    "classic", "desert", "jungle", "winter", "scifi", "volcanic", "wasteland", "moon", "swamp", "menu", "credits", "cannon-tube", "snow-theme",
+    "space-atmosphere", "new-beginning", "lost-in-the-desert", "desert-of-dreams-mix", "urban-jungle-2061", "jungle-pro-sensory", "iron-wasteland"
 };
 static const struct { const char *file, *title, *author; } tracks[MUSIC_SONGS] = {
 #define TRACK(id, file, world, title, author) [id] = { file, title, author },
     OFP_SOUNDTRACK(TRACK)
 #undef TRACK
 };
-static int16_t *pcm[MUSIC_SONGS];
-static int pcm_samples[MUSIC_SONGS];
-static int user_track[MUSIC_SONGS];
-static char loaded_file[MUSIC_SONGS][32];
+typedef struct {
+    int16_t *pcm;
+    int samples;
+    float gain;
+    xmp_context module;
+    char credit[120];
+} Track;
 
-const char *music_name(int which) { return song_file[which]; }
-static xmp_context mod_ctx[MUSIC_SONGS];
-static int mod_ok[MUSIC_SONGS];
+/* Only the playing track and a prepared transition are resident. */
+static Track *loaded[MUSIC_SONGS];
+static SDL_atomic_t ready[MUSIC_SONGS], started_song;
+static SDL_atomic_t stopping;
+static SDL_AudioDeviceID music_device;
+static SDL_Thread *loader;
+static SDL_mutex *loader_lock;
+static SDL_cond *loader_wake;
+static char track_dir[1100], user_dir[1100];
+static int have_user_dir;
 static int16_t mod_buf[512];
 static int mod_n, mod_at;
-static char credit[MUSIC_SONGS][120];                   /* "TITLE BY AUTHOR (LICENCE)" from credits.txt */
-static char mod_title[MUSIC_SONGS][64];
-static SDL_atomic_t started_song;                       /* (a song just began: the game shows its credit) */
 
-static int load_module(int k, const char *dir)
+const char *music_name(int which) { return which >= 0 && which < MUSIC_SONGS ? song_file[which] : ""; }
+
+static void free_track(Track *track)
+{
+    if (!track) return;
+    if (track->module) {
+        xmp_end_player(track->module);
+        xmp_free_context(track->module);
+    }
+    SDL_free(track->pcm);
+    SDL_free(track);
+}
+
+static int load_module(Track *track, int k, const char *dir, char *file, size_t size)
 {
     static const char *ext[] = { ".mod", ".xm", ".s3m", ".it" };
+    xmp_context context = xmp_create_context();
     int e;
+    if (!context) return 0;
     for (e = 0; e < 4; e++) {
         char path[1200];
         struct xmp_module_info mi;
         snprintf(path, sizeof path, "%.1100s%s%s", dir, song_file[k], ext[e]);
-        if (xmp_load_module(mod_ctx[k], path) != 0) continue;
-        if (xmp_start_player(mod_ctx[k], RATE, XMP_FORMAT_MONO) != 0) { xmp_release_module(mod_ctx[k]); continue; }
-        snprintf(loaded_file[k], sizeof loaded_file[k], "%s%s", song_file[k], ext[e]);
-        xmp_get_module_info(mod_ctx[k], &mi);
-        snprintf(mod_title[k], sizeof mod_title[k], "%s", mi.mod && mi.mod->name[0] ? mi.mod->name : song_file[k]);
+        if (xmp_load_module(context, path) != 0) continue;
+        if (xmp_start_player(context, RATE, XMP_FORMAT_MONO) != 0) { xmp_release_module(context); continue; }
+        track->module = context;
+        snprintf(file, size, "%s%s", song_file[k], ext[e]);
+        xmp_get_module_info(context, &mi);
+        snprintf(track->credit, sizeof track->credit, "%s", mi.mod && mi.mod->name[0] ? mi.mod->name : song_file[k]);
         return 1;
     }
+    xmp_free_context(context);
     return 0;
 }
 
-/* credits.txt: one line a song, "file | title | author | licence" (# for comments) */
-static void load_credits(const char *dir, int user)
+/* credits.txt: file | title | author | licence. Read only while preparing a track. */
+static void load_credit(Track *track, int which, const char *dir, const char *file)
 {
     char path[1200], line[400];
     FILE *f;
@@ -168,56 +184,165 @@ static void load_credits(const char *dir, int user)
             while (*p == ' ') p++;
             field[n++] = p;
             if (!bar) break;
-            *bar = 0;
-            p = bar + 1;
+            *bar = 0; p = bar + 1;
         }
-        for (k = 0; k < n; k++) {                        /* (trim the ends) */
+        for (k = 0; k < n; k++) {
             size_t l = strlen(field[k]);
             while (l && (field[k][l - 1] == ' ' || field[k][l - 1] == '\n' || field[k][l - 1] == '\r')) field[k][--l] = 0;
         }
-        if (n < 3) continue;
-        for (k = 0; k < MUSIC_SONGS; k++)
-            if (user_track[k] == user && loaded_file[k][0] &&
-                (!strcmp(field[0], loaded_file[k]) || !strcmp(field[0], song_file[k])))
-                snprintf(credit[k], sizeof credit[k], "%.50s BY %.40s%s%.20s%s", field[1], field[2], n > 3 ? " (" : "", n > 3 ? field[3] : "", n > 3 ? ")" : "");
+        if (n >= 3 && (!strcmp(field[0], file) || !strcmp(field[0], song_file[which])))
+            snprintf(track->credit, sizeof track->credit, "%.50s BY %.40s%s%.20s%s", field[1], field[2], n > 3 ? " (" : "", n > 3 ? field[3] : "", n > 3 ? ")" : "");
     }
     fclose(f);
 }
 
-void music_load(const char *data_dir, const char *user_dir)
+static Track *load_track(int k)
 {
-    char dir[1100], udir[1100];
-    int k;
-    snprintf(dir, sizeof dir, "%.1080s/music/", data_dir);
-    snprintf(udir, sizeof udir, "%.1080smusic/", user_dir ? user_dir : "");
-    if (getenv("OFP_MUSIC_DIR")) snprintf(udir, sizeof udir, "%.1080s/", getenv("OFP_MUSIC_DIR"));
-
-    for (k = 0; k < MUSIC_SONGS; k++) {
-        if (!mod_ctx[k]) mod_ctx[k] = xmp_create_context();
-        if (mod_ctx[k])
-            mod_ok[k] = (user_dir || getenv("OFP_MUSIC_DIR")) && load_module(k, udir);
-        user_track[k] = mod_ok[k];
-        if (!mod_ok[k] && tracks[k].file) {
+    Track *track = SDL_calloc(1, sizeof *track);
+    char file[64] = "";
+    const char *dir = track_dir;
+    if (!track) return NULL;  /* The synthesizer remains available on allocation failure. */
+    track->gain = 1.0f;
+    if (have_user_dir && load_module(track, k, user_dir, file, sizeof file)) dir = user_dir;
+    else {
+        if (tracks[k].file) {
             char path[1200];
-            snprintf(path, sizeof path, "%.1100soriginal/%s", dir, tracks[k].file);
-            pcm[k] = music_pcm_load(path, RATE, &pcm_samples[k]);
-            if (pcm[k]) {
-                snprintf(loaded_file[k], sizeof loaded_file[k], "%s", tracks[k].file);
-                snprintf(credit[k], sizeof credit[k], "%s BY %s", tracks[k].title, tracks[k].author);
+            snprintf(path, sizeof path, "%.1100soriginal/%s", track_dir, tracks[k].file);
+            track->pcm = music_pcm_load(path, RATE, &track->samples);
+            if (track->pcm) {
+                track->gain = music_pcm_loudness_gain(track->pcm, track->samples, RATE);
+                snprintf(file, sizeof file, "%s", tracks[k].file);
+                snprintf(track->credit, sizeof track->credit, "%s BY %s", tracks[k].title, tracks[k].author);
             }
         }
-        if (!mod_ok[k] && !pcm[k] && mod_ctx[k]) mod_ok[k] = load_module(k, dir);
+        if (!track->pcm) load_module(track, k, track_dir, file, sizeof file);
     }
-    load_credits(dir, 0);
-    if (user_dir || getenv("OFP_MUSIC_DIR")) load_credits(udir, 1);
+    if (file[0]) load_credit(track, k, dir, file);
+    return track;
 }
 
-int music_has_module(int which) { return which >= 0 && which < MUSIC_SONGS && mod_ok[which]; }
+static void lock_audio(void) { if (music_device) SDL_LockAudioDevice(music_device); }
+static void unlock_audio(void) { if (music_device) SDL_UnlockAudioDevice(music_device); }
+
+static void prepare_track(int which)
+{
+    Track *retired[MUSIC_SONGS], *track;
+    int k;
+    if (which < 0 || !SDL_AtomicGet(&want_volume) || SDL_AtomicGet(&ready[which])) return;
+    /* Detach unused data under the device lock; free it after releasing the lock. */
+    lock_audio();
+    for (k = 0; k < MUSIC_SONGS; k++) {
+        retired[k] = NULL;
+        if (k != song) {
+            retired[k] = loaded[k]; loaded[k] = NULL;
+            SDL_AtomicSet(&ready[k], 0);
+        }
+    }
+    unlock_audio();
+    for (k = 0; k < MUSIC_SONGS; k++) free_track(retired[k]);
+    track = load_track(which);
+    if (SDL_AtomicGet(&stopping) || which != SDL_AtomicGet(&want_song)) { free_track(track); return; }
+    lock_audio();
+    loaded[which] = track;
+    SDL_AtomicSet(&ready[which], 1);
+    unlock_audio();
+}
+
+static int load_worker(void *unused)
+{
+    (void)unused;
+    SDL_LockMutex(loader_lock);
+    while (!SDL_AtomicGet(&stopping)) {
+        int which = SDL_AtomicGet(&want_song);
+        if (which < 0 || !SDL_AtomicGet(&want_volume) || SDL_AtomicGet(&ready[which]))
+            SDL_CondWait(loader_wake, loader_lock);
+        else {
+            SDL_UnlockMutex(loader_lock);
+            prepare_track(which);
+            SDL_LockMutex(loader_lock);
+        }
+    }
+    SDL_UnlockMutex(loader_lock);
+    return 0;
+}
+
+static void request_track(void)
+{
+    if (loader) {
+        SDL_LockMutex(loader_lock);
+        SDL_CondSignal(loader_wake);
+        SDL_UnlockMutex(loader_lock);
+    } else prepare_track(SDL_AtomicGet(&want_song));  /* Offline previews and no-thread fallback. */
+}
+
+void music_play(int which)
+{
+    which = which >= 0 && which < MUSIC_SONGS ? which : -1;
+    if (SDL_AtomicSet(&want_song, which) != which || (which >= 0 && !SDL_AtomicGet(&ready[which]))) request_track();
+}
+
+void music_volume(int level)
+{
+    level = volume_clamp(level);
+    if (!SDL_AtomicSet(&want_volume, level) && level) request_track();
+}
+
+void music_load(const char *data_dir, const char *preferences_dir)
+{
+    snprintf(track_dir, sizeof track_dir, "%.1080s/music/", data_dir);
+    snprintf(user_dir, sizeof user_dir, "%.1080smusic/", preferences_dir ? preferences_dir : "");
+    have_user_dir = preferences_dir != NULL || getenv("OFP_MUSIC_DIR") != NULL;
+    if (getenv("OFP_MUSIC_DIR")) snprintf(user_dir, sizeof user_dir, "%.1080s/", getenv("OFP_MUSIC_DIR"));
+}
+
+void music_set_device(SDL_AudioDeviceID device)
+{
+    music_device = device;
+    loader_lock = SDL_CreateMutex();
+    loader_wake = SDL_CreateCond();
+    if (loader_lock && loader_wake) loader = SDL_CreateThread(load_worker, "music-loader", NULL);
+    if (!loader) {
+        if (loader_wake) SDL_DestroyCond(loader_wake);
+        if (loader_lock) SDL_DestroyMutex(loader_lock);
+        loader_wake = NULL; loader_lock = NULL;
+    }
+}
+
+int music_has_module(int which)
+{
+    int result;
+    lock_audio();
+    result = which >= 0 && which < MUSIC_SONGS && loaded[which] && loaded[which]->module;
+    unlock_audio();
+    return result;
+}
 
 const char *music_credit(int which)
 {
-    if (which < 0 || which >= MUSIC_SONGS || (!mod_ok[which] && !pcm[which])) return "";
-    return credit[which][0] ? credit[which] : mod_title[which];
+    static char copy[120];  /* Called by the main thread, never by the mixer. */
+    lock_audio();
+    snprintf(copy, sizeof copy, "%s", which >= 0 && which < MUSIC_SONGS && loaded[which] ? loaded[which]->credit : "");
+    unlock_audio();
+    return copy;
+}
+
+size_t music_cached_bytes(void)
+{
+    size_t bytes = 0;
+    int k;
+    lock_audio();
+    for (k = 0; k < MUSIC_SONGS; k++) if (loaded[k]) bytes += (size_t)loaded[k]->samples * sizeof(int16_t);
+    unlock_audio();
+    return bytes;
+}
+
+int music_cached_tracks(void)
+{
+    int k, count = 0;
+    lock_audio();
+    for (k = 0; k < MUSIC_SONGS; k++) count += loaded[k] != NULL;
+    unlock_audio();
+    return count;
 }
 
 int music_started(void) { return SDL_AtomicSet(&started_song, -1); }
@@ -225,7 +350,7 @@ int music_started(void) { return SDL_AtomicSet(&started_song, -1); }
 static int module_sample(int k)
 {
     if (mod_at >= mod_n) {                               /* the next stretch (the song loops for ever) */
-        if (xmp_play_buffer(mod_ctx[k], mod_buf, (int)sizeof mod_buf, 0) != 0) { mod_n = 0; return 0; }
+        if (xmp_play_buffer(loaded[k]->module, mod_buf, (int)sizeof mod_buf, 0) != 0) { mod_n = 0; return 0; }
         mod_n = (int)(sizeof mod_buf / sizeof mod_buf[0]);
         mod_at = 0;
     }
@@ -238,23 +363,25 @@ int music_sample(void)
     float out, rnd, gain, dt = 1.0f / RATE;
     int stp, ws = SDL_AtomicGet(&want_song);
     int level = SDL_AtomicGet(&want_volume);
+    if (ws >= 0 && !SDL_AtomicGet(&ready[ws])) ws = song; /* Keep playing while the loader works. */
     if (ws != song) {                                      /* fade out, then start the new one */
         fade -= 0.0005f;
         if (fade <= 0.0f) {
             fade = 0.0f; song = ws; pos = 0; last_step = -1; env_bass = env_lead = 0;
-            if (song >= 0 && mod_ok[song]) { xmp_restart_module(mod_ctx[song]); mod_n = mod_at = 0; }
+            if (song >= 0 && loaded[song] && loaded[song]->module) { xmp_restart_module(loaded[song]->module); mod_n = mod_at = 0; }
             SDL_AtomicSet(&started_song, song);
         }
     } else if (fade < 1.0f) fade += 0.0005f;
     if (song < 0 || !level) return 0;
     gain = fade * ((float)level / VOLUME_MAX);
-    if (mod_ok[song]) {                                  /* a module: as it was written, at the chosen level */
+    if (loaded[song] && loaded[song]->module) {                                  /* a module: as it was written, at the chosen level */
         return (int)((float)module_sample(song) * gain * 0.42f);
     }
-    if (pcm[song]) {
-        int value = pcm[song][pos++];
-        if (pos == (uint32_t)pcm_samples[song]) pos = 0;
-        return (int)((float)value * gain * 0.42f);
+    if (loaded[song] && loaded[song]->pcm) {
+        Track *track = loaded[song];
+        int value = track->pcm[pos++];
+        if (pos == (uint32_t)track->samples) pos = 0;
+        return (int)((float)value * track->gain * gain * 0.42f);
     }
     s = &songs[song];
     if (!s->bpm) s = &songs[BIOME_SCIFI];
@@ -305,21 +432,32 @@ void music_init(void)
 {
     SDL_AtomicSet(&want_song, -1);
     SDL_AtomicSet(&started_song, -1);
-    music_volume(6);
+    SDL_AtomicSet(&stopping, 0);
+    SDL_AtomicSet(&want_volume, 6);
+    song = -1; fade = 0; pos = 0;
 }
 
 void music_close(void)
 {
     int k;
-    for (k = 0; k < MUSIC_SONGS; k++) {
-        if (mod_ok[k]) xmp_end_player(mod_ctx[k]);
-        if (mod_ctx[k]) xmp_free_context(mod_ctx[k]);
-        mod_ctx[k] = NULL;
-        mod_ok[k] = 0;
-        SDL_free(pcm[k]);
-        pcm[k] = NULL;
-        credit[k][0] = loaded_file[k][0] = 0;
+    /* Pause first, but keep the device alive until the worker has released it. */
+    if (music_device) SDL_PauseAudioDevice(music_device, 1);
+    SDL_AtomicSet(&stopping, 1);
+    if (loader) {
+        SDL_LockMutex(loader_lock);
+        SDL_CondSignal(loader_wake);
+        SDL_UnlockMutex(loader_lock);
+        SDL_WaitThread(loader, NULL);
+        loader = NULL;
+        SDL_DestroyCond(loader_wake); SDL_DestroyMutex(loader_lock);
+        loader_wake = NULL; loader_lock = NULL;
     }
-    song = -1;
-    fade = 0;
+    for (k = 0; k < MUSIC_SONGS; k++) {
+        free_track(loaded[k]); loaded[k] = NULL;
+        SDL_AtomicSet(&ready[k], 0);
+    }
+    music_device = 0;
+    song = -1; fade = 0;
+    SDL_AtomicSet(&want_song, -1);
+    SDL_AtomicSet(&started_song, -1);
 }

@@ -573,13 +573,19 @@ static int arena_spawn(const Game *g, const Tank *t)
 {
     int k, j, best = -1, halves = !(g->extras & EXTRA_ANNIHILATION), in_half = 0;
     fx best_d = 0;
-    int others = 0;
     if (halves) for (k = 0; k < g->map.num_spawns; k++) in_half += own_half(g, k, t->team);
     if (!in_half) halves = 0;                            /* (an arena that isn't split: all of it) */
-    for (j = 0; j < g->num_tanks; j++) if (&g->tanks[j] != t && g->tanks[j].active && !g->tanks[j].respawn) others++;
-    (void)others;
     if (g->tick == 0) {                                  /* the start: one each, round its half */
-        int nth = (int)(t - g->tanks) / (halves ? 2 : 1), c = 0;
+        int nth = (int)(t - g->tanks), c = 0;
+        if (halves) {
+            if (g->legacy_arena_spawns) nth /= 2;
+            else {
+                /* Count teammates already placed; lobby slots need not alternate teams. */
+                nth = 0;
+                for (j = 0; &g->tanks[j] < t; j++)
+                    if (g->tanks[j].team == t->team) nth++;
+            }
+        }
         for (k = 0; k < g->map.num_spawns; k++)
             if (!halves || own_half(g, k, t->team)) { if (c == nth % (halves ? in_half : g->map.num_spawns)) return k; c++; }
         return 0;
