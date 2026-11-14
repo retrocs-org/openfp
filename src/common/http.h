@@ -2,7 +2,8 @@
  * A small HTTP client for talking to the server listing service: servers announce
  * themselves, games fetch the list. https:// and http:// through libcurl where the
  * build has it (OFP_HAVE_CURL); otherwise our own plain HTTP/1.0, and an https://
- * address is asked over http:// instead (the listing answers both, for old machines). */
+ * address is asked over http:// instead for legacy listing reads only. Cloud account
+ * callers require http_has_tls() and always use verified HTTPS without fallback. */
 #ifndef OFP_HTTP_H
 #define OFP_HTTP_H
 

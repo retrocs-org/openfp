@@ -13,13 +13,18 @@
 #include "platform/sdl2/select.h"
 #include "platform/sdl2/render.h"
 #include "core/game.h"
+#include "common/cloud.h"
+#include "common/http.h"
+#ifndef _WIN32
+#include <sys/stat.h>
+#endif
 
 /* stats: matches, won, tanks destroyed and lost; wins by LOCAL GAME's mode; matches by tank */
 /* controls: the pad's layout and buttons (-2: the machine's), its own keys (has_keys) */
 typedef struct { char name[16]; uint8_t key[32]; int tank, avatar;
                  int matches, won, kills, lost, mode_won[5], cls_played[3];
                  int pad_layout, pad_fire, pad_mine, has_keys, keys[6][2];
-                 int steer; } Profile;                 /* (steer: STEER_TANK, STEER_DIRECT: the original's) */
+                 int steer; char session[65]; } Profile;                 /* (steer: STEER_TANK, STEER_DIRECT: the original's) */
 
 #define AVATARS 10                                   /* data/avatars.png: ten portraits, 24 x 24 (tools/make_avatars.py) */
 static const Theme *theme;                            /* (for the tank cards) */
@@ -54,6 +59,8 @@ static struct {
     int      step, tank, avatar;                      /* making one: 0 the name, 1 the tank, 2 the avatar */
     InputBits prev;
     char     name[16];
+    CloudAccount cloud_account;
+    int cloud_ready;
     Osk      osk;
 } pk;
 
@@ -71,6 +78,9 @@ static void save(void)
     FILE *f = fopen(path_of(path, sizeof path), "w");
     int i, k;
     if (!f) return;
+#ifndef _WIN32
+    fchmod(fileno(f), 0600);
+#endif
     fprintf(f, "# OpenFP profiles: name, key (who you are online: keep it to yourself), tank, avatar\n");
     for (i = 0; i < nprof; i++) {
         fprintf(f, "%s\t", prof[i].name);
@@ -87,6 +97,7 @@ static void save(void)
             fprintf(f, "\t%d\n", prof[i].steer);           /* (the steering, a field more) */
         }
     }
+    for (i = 0; i < nprof; i++) if (prof[i].session[0]) fprintf(f, "CLOUD\t%d\t%s\n", i, prof[i].session);
     fclose(f);
 }
 
@@ -106,12 +117,23 @@ void signin_init(void)
 {
     char path[1100], line[256];
     FILE *f = fopen(path_of(path, sizeof path), "r");
+    for (int i = 0; i < nprof; i++) cloud_forget(prof[i].key);
+    memset(prof, 0, sizeof prof);
     nprof = 0;
     if (!f) return;
-    while (nprof < MAX_PROFILES && fgets(line, sizeof line, f)) {
+    while (fgets(line, sizeof line, f)) {
         char *t1, *t2;
-        Profile *p = &prof[nprof];
+        Profile *p;
         int k;
+        if (!strncmp(line, "CLOUD\t", 6)) {
+            int index; char token[65]; uint8_t scratch[32];
+            if (sscanf(line, "CLOUD\t%d\t%64s", &index, token) == 2 && index >= 0 && index < nprof && !cloud_unhex(token, scratch, 32)) {
+                strcpy(prof[index].session, token); cloud_register(prof[index].key, token);
+            }
+            continue;
+        }
+        if (nprof >= MAX_PROFILES) continue;
+        p = &prof[nprof];
         if (line[0] == '#' || !(t1 = strchr(line, '\t')) || !(t2 = strchr(t1 + 1, '\t'))) continue;
         *t1 = 0;
         snprintf(p->name, sizeof p->name, "%.15s", line);
@@ -223,12 +245,16 @@ static void create(void)                             /* NEW PROFILE: the typed n
     int i;
     while (*n == ' ') n++;
     if (!*n) return;
-    for (i = 0; i < nprof; i++) if (!SDL_strcasecmp(prof[i].name, n)) { if (!profile_in(i)) take(i); return; }   /* (theirs already) */
+    for (i = 0; i < nprof; i++) if (!SDL_strcasecmp(prof[i].name, n) &&
+        (!pk.cloud_ready || !memcmp(prof[i].key, pk.cloud_account.key, 32))) { if (!profile_in(i)) take(i); return; }   /* (theirs already) */
     if (nprof >= MAX_PROFILES) return;
     memset(&prof[nprof], 0, sizeof prof[nprof]);         /* (a new one: no stats, the machine's controls) */
     prof[nprof].pad_layout = prof[nprof].pad_fire = prof[nprof].pad_mine = -2;
     snprintf(prof[nprof].name, sizeof prof[nprof].name, "%.15s", n);
-    new_key(prof[nprof].key);
+    if (pk.cloud_ready) {
+        memcpy(prof[nprof].key, pk.cloud_account.key, 32);
+        strcpy(prof[nprof].session, pk.cloud_account.session);
+    } else new_key(prof[nprof].key);
     prof[nprof].tank = pk.tank;
     prof[nprof].avatar = pk.avatar;
     nprof++;
@@ -236,9 +262,159 @@ static void create(void)                             /* NEW PROFILE: the typed n
     take(nprof - 1);
 }
 
+
+static struct {
+    int open, row, editing, creating, kind, cancelled;
+    char username[16], email[255], password[73], error[96];
+    CloudDevice device; CloudAccount account;
+    SDL_Thread *thread; SDL_atomic_t done;
+    int result; Uint32 started, poll_at;
+    InputBits prev;
+} cu;
+#ifndef OFP_TVOS
+static char *cloud_ui_field(size_t *cap) {
+    if (cu.row == 1) { *cap=sizeof cu.username; return cu.username; }
+    if (cu.row == 2) { *cap=sizeof cu.email; return cu.email; }
+    *cap=sizeof cu.password; return cu.password;
+}
+#endif
+static int cloud_ui_worker(void *unused) {
+    (void)unused;
+    if (cu.kind == 1) cu.result=cloud_login(&cu.account,cu.username,cu.email,cu.password,cu.creating,cu.error);
+    else if (cu.kind == 2) cu.result=cloud_device_start(&cu.device,cu.error);
+    else cu.result=cloud_device_poll(&cu.device,&cu.account,cu.error);
+    SDL_AtomicSet(&cu.done,1); return 0;
+}
+static void cloud_ui_launch(int kind) {
+    if (cu.thread) return;
+    cu.kind=kind; cu.error[0]=0; SDL_AtomicSet(&cu.done,0); http_init();
+    cu.thread=SDL_CreateThread(cloud_ui_worker,"cloud-login",NULL);
+    if (!cu.thread) { snprintf(cu.error,sizeof cu.error,"Cannot start account sign-in."); cu.kind=0; }
+}
+static void cloud_ui_open(void) {
+    memset(&cu,0,sizeof cu); cu.open=1; cu.row=1; cu.prev=input_device_menu(pk.dev)|IN_FIRE;
+#ifdef OFP_TVOS
+    cu.started=SDL_GetTicks(); cloud_ui_launch(2);
+#endif
+}
+static void cloud_ui_close(void) {
+    if (cu.thread) { cu.cancelled=1; return; }
+    cu.open=cu.editing=0; memset(cu.password,0,sizeof cu.password); memset(&pk.osk,0,sizeof pk.osk);
+    SDL_StopTextInput(); pk.prev=input_device_menu(pk.dev)|IN_FIRE|IN_MINE;
+}
+static void cloud_ui_success(void) {
+    int i;
+    cloud_register(cu.account.key,cu.account.session);
+    for (i=0;i<nprof;i++) if (!memcmp(prof[i].key,cu.account.key,32)) {
+        if (profile_in(i)) { snprintf(cu.error,sizeof cu.error,"This account is already signed in."); return; }
+        strcpy(prof[i].session,cu.account.session); strcpy(prof[i].name,cu.account.name); save();
+        cloud_ui_close(); take(i); return;
+    }
+    if(nprof>=MAX_PROFILES) {snprintf(cu.error,sizeof cu.error,"No space for another profile.");return;}
+    pk.cloud_account=cu.account; pk.cloud_ready=1; strcpy(pk.name,cu.account.name);
+    pk.step=1;pk.tank=1;pk.avatar=nprof%AVATARS; cloud_ui_close();
+}
+static int cloud_ui_event(const SDL_Event *ev,int pad) {
+    if(cu.thread) {
+        if(ev->type==SDL_KEYDOWN && ev->key.keysym.sym==SDLK_ESCAPE) cu.cancelled=1;
+        return 1;
+    }
+    if(pk.osk.open) {
+        if(pad&&input_device_of_event(ev)==pk.dev) {
+            int status=osk_pad(&pk.osk,pad);
+            if(status!=OSK_TYPING) {cu.editing=0;memset(&pk.osk,0,sizeof pk.osk);}
+        }
+        return 1;
+    }
+#ifndef OFP_TVOS
+    if(cu.editing) {
+        size_t cap,n; char *field=cloud_ui_field(&cap); n=strlen(field);
+        if(ev->type==SDL_TEXTINPUT) {
+            const unsigned char *p=(const unsigned char *)ev->text.text;
+            for(;*p;p++) if(*p>=32&&*p<127&&n+1<cap) {field[n++]=(char)*p;field[n]=0;}
+        } else if(ev->type==SDL_KEYDOWN) {
+            if(ev->key.keysym.sym==SDLK_BACKSPACE&&n) field[n-1]=0;
+            if(ev->key.keysym.sym==SDLK_RETURN||ev->key.keysym.sym==SDLK_ESCAPE) {
+                cu.editing=0;SDL_StopTextInput();cu.prev=input_device_menu(pk.dev)|IN_FIRE|IN_MINE;
+            }
+        }
+        return 1;
+    }
+#endif
+    if(ev->type==SDL_KEYDOWN&&!ev->key.repeat) {
+        if(ev->key.keysym.sym==SDLK_ESCAPE) cloud_ui_close();
+        if(ev->key.keysym.sym==SDLK_RETURN) pk.enter=1;
+    }
+    return 1;
+}
+static void cloud_ui_frame(void) {
+    InputBits b=input_device_menu(pk.dev),pr=b&~cu.prev;cu.prev=b;
+    if(cu.thread) {
+        if(pr&IN_MINE) cu.cancelled=1;
+        if(!SDL_AtomicGet(&cu.done)) return;
+        SDL_WaitThread(cu.thread,NULL);cu.thread=NULL;
+        memset(cu.password,0,sizeof cu.password);
+        memset(&pk.osk,0,sizeof pk.osk);
+        if(cu.cancelled) {cloud_ui_close();return;}
+        if((cu.kind==1&&cu.result==0)||(cu.kind==3&&cu.result==1)) {cloud_ui_success();return;}
+        if(cu.kind==2&&cu.result==0) {cu.poll_at=SDL_GetTicks()+5000;cu.started=SDL_GetTicks();}
+        if(cu.kind==3&&cu.result==0) cu.poll_at=SDL_GetTicks()+5000;
+        cu.kind=0;
+    }
+#ifdef OFP_TVOS
+    if(pr&IN_MINE) {cloud_ui_close();return;}
+    if(SDL_GetTicks()-cu.started>=600000) {cu.poll_at=0;snprintf(cu.error,sizeof cu.error,"PIN expired. Close and try again.");}
+    if(cu.poll_at&&(Sint32)(SDL_GetTicks()-cu.poll_at)>=0) {cu.poll_at=0;cloud_ui_launch(3);}
+#else
+    if(cu.editing||pk.osk.open) return;
+    if(pk.enter) {pr|=IN_FIRE;pk.enter=0;}
+    if(pr&IN_UP) cu.row=(cu.row+5)%6;
+    if(pr&IN_DOWN) cu.row=(cu.row+1)%6;
+    if(!cu.creating&&cu.row==2) cu.row=pr&IN_UP?1:3;
+    if(pr&IN_MINE) {cloud_ui_close();return;}
+    if(cu.row==0&&(pr&(IN_FIRE|IN_LEFT|IN_RIGHT))) cu.creating=!cu.creating;
+    else if(pr&IN_FIRE) {
+        if(cu.row==5) cloud_ui_close();
+        else if(cu.row==4) cloud_ui_launch(1);
+        else if(cu.row>=1&&cu.row<=3) {
+            size_t cap;char *field=cloud_ui_field(&cap);cu.editing=1;
+            if(pk.dev>=DEV_PAD1) osk_open(&pk.osk,field,cap,cu.row==1?"USERNAME":cu.row==2?"EMAIL":"PASSWORD",cu.row==3);
+            else SDL_StartTextInput();
+        }
+    }
+#endif
+}
+static void cloud_ui_draw(SDL_Renderer *r,int sw,int sh) {
+    int x=8,y=8,w=sw-16; const HudColors *c=ui_colors();char line[96];
+    ui_fill(r,x,y,w,sh-16,(Rgb){16,16,12});ui_frame(r,x,y,w,sh-16);
+    ui_text_bold(r,x+8,y+8,1,c->value,"CLOUD PROFILE");
+#ifdef OFP_TVOS
+    ui_text(r,x+8,y+35,1,UI_WHITE,"ON YOUR PHONE OR COMPUTER, OPEN");
+    ui_text(r,x+8,y+51,1,c->value,CLOUD_PIN_URL);
+    snprintf(line,sizeof line,"PIN: %s",cu.thread&&cu.kind==2?"...":cu.device.pin);ui_text_bold(r,x+8,y+78,2,UI_WHITE,line);
+    ui_text(r,x+8,y+108,1,UI_WHITE,"ENTER THE PIN AND SIGN IN.");
+#else
+    for(int i=0;i<6;i++) {
+        const char *label=i==0?(cu.creating?"CREATE CLOUD ACCOUNT":"SIGN IN"):i==1?"USERNAME":i==2?"EMAIL":i==3?"PASSWORD":i==4?(cu.creating?"CREATE ACCOUNT":"CONNECT"):"CANCEL";
+        const char *value=i==1?cu.username:i==2?cu.email:i==3?(cu.password[0]?"************":""):"";
+        int yy=y+28+i*20,on=cu.row==i;
+        if(i==2&&!cu.creating) continue;
+        ui_fill(r,x+6,yy-2,w-12,18,on?c->value:(Rgb){30,30,24});
+        ui_text_bold(r,x+10,yy,1,on?(Rgb){16,16,12}:UI_WHITE,label);
+        snprintf(line,sizeof line,"%.22s%s",value,cu.editing&&on?"_":"");
+        ui_text(r,x+w-12-ui_text_width(line,1),yy+8,1,on?(Rgb){16,16,12}:c->value,line);
+    }
+#endif
+    if(cu.thread) ui_text(r,x+8,sh-40,1,c->value,"CONNECTING...");
+    else if(cu.error[0]) {snprintf(line,sizeof line,"%.58s",cu.error);ui_text(r,x+8,sh-40,1,c->value,line);}
+    ui_text(r,x+8,sh-24,1,UI_GREY,"LOCAL PROFILES: LOCAL AND PRIVATE GAMES ONLY");
+    if(pk.osk.open) osk_draw(r,&pk.osk,sw,sh);
+}
+
 int signin_event(const SDL_Event *ev, int pad)
 {
     int dev;
+    if (pk.open && cu.open) return cloud_ui_event(ev,pad);
     if (pk.open && pk.typing) {                          /* typing a new profile's name */
         if (pk.osk.open) {                               /* (a pad: the on-screen keyboard) */
             if (pad && input_device_of_event(ev) == pk.dev) {
@@ -292,6 +468,7 @@ void signin_frame(void)
 {
     Uint32 now = SDL_GetTicks();
     int i;
+    if (pk.open && cu.open) {cloud_ui_frame();return;}
     if (pk.open && pk.keep_signed_in) {
         if (!input_device_present(pk.dev)) { pk.open = 0; return; }
     } else {
@@ -315,7 +492,12 @@ void signin_frame(void)
             }
         }
         if (pr & IN_FIRE) { pk.step = 0; create(); }    /* done: in */
-        else if (pr & IN_MINE) {                         /* back: the name again */
+        else if (pr & IN_MINE) {                         /* back: the name or profile picker */
+            if (pk.cloud_ready) {
+                pk.cloud_ready = 0; pk.step = 0; pk.prev = b;
+                memset(&pk.cloud_account, 0, sizeof pk.cloud_account);
+                return;
+            }
             pk.step = 0; pk.typing = 1;
             if (pk.dev >= DEV_PAD1) osk_open(&pk.osk, pk.name, sizeof pk.name, "YOUR NAME", 0);
             else SDL_StartTextInput();
@@ -351,7 +533,7 @@ void signin_frame(void)
             if (r == OW_CONTROLLER) { pk.sub = 1; pk.sel = 0; }
             else if (r == OW_PADBACK) { pk.sub = 0; pk.sel = 0; }
             else if (r == OW_DEFAULTS) { p->pad_layout = p->pad_fire = p->pad_mine = -2; save(); apply_controls(); }
-            else if (r == OW_NAME) {                     /* a new name: the on-screen keyboard (a pad) or typed */
+            else if (r == OW_NAME && !p->session[0]) {                     /* a new name: the on-screen keyboard (a pad) or typed */
                 pk.typing = 1; pk.renaming = 1;
                 snprintf(pk.name, sizeof pk.name, "%s", p->name);
                 if (pk.dev >= DEV_PAD1) osk_open(&pk.osk, pk.name, sizeof pk.name, "YOUR NAME", 0);
@@ -367,19 +549,22 @@ void signin_frame(void)
     }
     if (pk.open && !pk.typing) {                         /* the picker, with its own device */
         InputBits b = input_device_menu(pk.dev), pr = b & ~pk.prev;   /* (a pad: A OK, B back, whatever it's set to) */
-        int rows = nprof + 1, tries;
+        int rows = nprof + 2, tries;
         if (pk.enter) { pr |= IN_FIRE; pk.enter = 0; }
         pk.prev = b;
         if (pr & (IN_UP | IN_DOWN)) {
             for (tries = 0; tries < rows; tries++) {
                 pk.sel = (pk.sel + ((pr & IN_UP) ? rows - 1 : 1)) % rows;
-                if (pk.sel == nprof || !profile_in(pk.sel)) break;   /* (not someone already in) */
+                if (pk.sel >= nprof || !profile_in(pk.sel)) break;   /* (not someone already in) */
             }
         }
         if (pr & IN_MINE) { pk.open = 0; return; }       /* not now */
         if (pr & IN_FIRE) {
             if (pk.sel < nprof) { if (!profile_in(pk.sel)) take(pk.sel); }
+            else if (pk.sel == nprof + 1) cloud_ui_open();
             else {                                       /* NEW PROFILE: a name, then a tank and an avatar */
+                pk.cloud_ready = 0;
+                memset(&pk.cloud_account, 0, sizeof pk.cloud_account);
                 pk.typing = 1;
                 pk.tank = 1;
                 pk.avatar = nprof % AVATARS;
@@ -565,10 +750,11 @@ void signin_draw_picker(SDL_Renderer *r, int sw, int sh)
 {
     const HudColors *c = ui_colors();
     /* Keep space for match records when there are profiles to select. */
-    int rows = nprof + 1, bw = 300, h = pk.step ? 76 : 24 + rows * 11 + (nprof ? 42 : 6) + 12;
+    int rows = nprof + 2, bw = 300, h = pk.step ? 76 : 24 + rows * 11 + (nprof ? 42 : 6) + 12;
     int x = (sw - bw) / 2, y = (sh - h) / 2, i;
     char buf[64];
     if (!pk.open) return;
+    if (cu.open) {cloud_ui_draw(r,sw,sh);return;}
     if (pk.typing && pk.osk.open) { osk_draw(r, &pk.osk, sw, sh); return; }
     if (pk.own) {                                        /* your own profile: who, your record; a pad's settings; SIGN OUT, BACK */
         int me = signed_in(pk.dev), k, orows = own_rows(), oh = 62 + orows * 12 + 12, oy = (sh - oh) / 2;
@@ -657,7 +843,7 @@ void signin_draw_picker(SDL_Renderer *r, int sw, int sh)
             badge(r, x + 8, ry - 1, prof[i].avatar, prof[i].name);
             const char *tank = tank_label[available_pick(prof[i].tank)];
             ui_text(r, x + bw - 8 - ui_text_width(tank, 1), ry, 1, i == pk.sel ? (Rgb){ 20, 18, 10 } : UI_GREY, tank);
-        } else snprintf(buf, sizeof buf, "NEW PROFILE");
+        } else snprintf(buf, sizeof buf, "%s", i == nprof ? "NEW LOCAL PROFILE" : "CLOUD PROFILE");
         upcase(buf);
         ui_text(r, x + 22, ry, 1, i == pk.sel ? (Rgb){ 20, 18, 10 } : in ? UI_GREY : UI_WHITE, buf);
     }

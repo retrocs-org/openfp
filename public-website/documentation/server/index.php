@@ -28,6 +28,7 @@ bots = 0
 fill_bots = yes
 time_limit = 20
 lives = 5</code></pre>
+<p>Public servers require registered cloud authentication; follow the <a href="/documentation/accounts/">account service setup</a> before enabling public listing. Update clients and servers together (protocol 40). A join password is separate from each player’s cloud password.</p>
 <p>Add a <code>password</code> to restrict joining. For a public server, set <code>public = yes</code> and decide whether to enable result and replay sharing. Run <code>--check</code> after changes.</p>
 <div class="documentation-table"><table><thead><tr><th>Settings</th><th>Purpose</th></tr></thead><tbody>
 <tr><td><code>name</code>, <code>motd</code>, <code>password</code></td><td>Server identity, welcome message and optional join password.</td></tr>

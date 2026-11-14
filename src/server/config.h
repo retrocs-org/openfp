@@ -10,6 +10,7 @@ typedef struct {
     uint16_t port;
     int      max_players, min_players, public_listed, announce_s;
     char     listing_url[256], public_host[128];
+    char     cloud_server[33], cloud_secret[65];
     int      versus, ai_level, biome, time, original, countdown_s;
     char     map_file[512], map_name[32];
     char     database[512], log_file[512], replay_dir[512];

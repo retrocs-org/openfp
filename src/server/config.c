@@ -102,6 +102,8 @@ int config_load(ServerSettings *s, const char *path)
         else if (!strcmp(k, "min_players")) s->min_players = atoi(v);
         else if (!strcmp(k, "auto_start")) s->auto_start = yes(v);
         else if (!strcmp(k, "public")) s->public_listed = !strcmp(v, "code") ? 2 : yes(v);   /* (code: a join code, not listed) */
+        else if (!strcmp(k, "cloud_server")) snprintf(s->cloud_server, sizeof s->cloud_server, "%s", v);
+        else if (!strcmp(k, "cloud_secret")) snprintf(s->cloud_secret, sizeof s->cloud_secret, "%s", v);
         else if (!strcmp(k, "listing_url")) snprintf(s->listing_url, sizeof s->listing_url, "%s", v);
         else if (!strcmp(k, "public_host")) snprintf(s->public_host, sizeof s->public_host, "%s", v);
         else if (!strcmp(k, "announce_every")) s->announce_s = atoi(v) < 20 ? 20 : atoi(v);
@@ -197,6 +199,7 @@ int config_load(ServerSettings *s, const char *path)
 void config_to_server(const ServerSettings *s, ServerConfig *o)
 {
     server_default_config(o);
+    if (s->public_listed == 1) snprintf(o->cloud_server, sizeof o->cloud_server, "%s", s->cloud_server[0] ? s->cloud_server : "unconfigured");
     snprintf(o->name, sizeof o->name, "%s", s->name);
     snprintf(o->motd, sizeof o->motd, "%s", s->motd);
     snprintf(o->password, sizeof o->password, "%s", s->password);

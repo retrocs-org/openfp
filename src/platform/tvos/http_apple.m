@@ -11,6 +11,13 @@
 @property(nonatomic) dispatch_semaphore_t finished;
 @end
 @implementation OFPHTTPReader
+- (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task
+ willPerformHTTPRedirection:(NSHTTPURLResponse *)response newRequest:(NSURLRequest *)request
+ completionHandler:(void (^)(NSURLRequest *))finish
+{
+    (void)session; (void)response;
+    finish([task.originalRequest.HTTPMethod isEqualToString:@"POST"] ? nil : request);
+}
 - (void)URLSession:(NSURLSession *)session dataTask:(NSURLSessionDataTask *)task
  didReceiveResponse:(NSURLResponse *)response completionHandler:(void (^)(NSURLSessionResponseDisposition))finish
 {

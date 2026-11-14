@@ -8,7 +8,7 @@ page_start('API documentation', 'api', 'Use the OpenFP API for public servers, m
   <p class="eyebrow">For clients, server operators and integrations</p>
   <h1>API documentation</h1>
   <p class="lead">Find a server, browse maps, read match results or connect your dedicated server to the public listing.</p>
-  <nav class="section-nav" aria-label="API sections"><a href="#basics">Getting started</a><a href="#read">Read data</a><a href="#report">Server reporting</a><a href="#uploads">Maps &amp; daily runs</a><a href="#join">Join codes</a><a href="#errors">Errors</a></nav>
+  <nav class="section-nav" aria-label="API sections"><a href="#basics">Getting started</a><a href="#read">Read data</a><a href="#report">Server reporting</a><a href="#accounts">Cloud accounts</a><a href="#uploads">Maps &amp; daily runs</a><a href="#join">Join codes</a><a href="#errors">Errors</a></nav>
 
   <h2 id="basics">Getting started</h2>
   <p>Base URL: <code>https://openfp.retrocs.org/api/</code>. Public reads need no API key. The API lists servers and shares results; matches themselves use the game’s UDP protocol, not this HTTP API.</p>
@@ -47,11 +47,27 @@ curl 'https://openfp.retrocs.org/api/?action=matches&amp;limit=10'</code></pre>
   <p>For <code>action=maps&amp;format=text</code>, each map has seven tab-separated fields: <code>id, name, author, world, time, size, downloads</code>. Compatible modes are available in JSON; no columns have been added to the legacy text format.</p>
   <p>JSON clients should accept additional fields. Match entries include server identity, map, world, duration, winner and player results. Match player results are returned as nested arrays.</p>
 
+  <h2 id="accounts">Cloud accounts</h2>
+  <p>Account requests use <code>POST https://openfp.retrocs.org/account/api/</code> with an URL-encoded body. HTTPS is required. Replies are newline-separated <code>key=value</code> fields with <code>Cache-Control: no-store</code>. Never log passwords, session tokens or server secrets.</p>
+  <div class="wrap-table"><table><thead><tr><th>Action</th><th>Fields</th><th>Reply</th></tr></thead><tbody>
+  <tr><td><code>register</code></td><td><code>username, email, password</code></td><td><code>id, username, key, session</code></td></tr>
+  <tr><td><code>login</code></td><td><code>username, password</code></td><td><code>id, username, key, session</code></td></tr>
+  <tr><td><code>device_start</code></td><td>None; Apple TV pairing</td><td><code>device, pin, url</code>; ten-minute lifetime</td></tr>
+  <tr><td><code>device_poll</code></td><td><code>device</code>; poll every five seconds</td><td>202 with <code>status=pending</code>, or 200 with account fields once approved; single use</td></tr>
+  <tr><td><code>ticket</code></td><td><code>session, server, server_id, nonce, key_id</code></td><td><code>ticket</code>; 60-second, single-use server challenge ticket</td></tr>
+  <tr><td><code>verify</code></td><td><code>server, secret, ticket, server_id, nonce, key_id</code>; registered server only</td><td><code>id, username</code></td></tr>
+  <tr><td><code>logout</code></td><td><code>session</code></td><td><code>status=signed out</code>; revokes that session</td></tr>
+  </tbody></table></div>
+  <p>Errors contain <code>error</code>: 400 invalid fields, 401 bad credentials or expired session, 403 invalid server/ticket, 413 oversized body, 426 HTTPS required, 429 rate limit, 503 unavailable. Account bodies are limited to 4 KiB. Client sessions last 30 days by default. PIN approval uses the browser page <a href="/account/pin">/account/pin</a>, with account sign-in and CSRF protection. Read the <a href="/documentation/accounts/">account guide</a> for identity-key derivation and operator setup.</p>
+
   <h2 id="report">Dedicated-server reporting</h2>
+  <p>All server reporting and polling requests require HTTPS and <code>cloud_server</code> plus <code>cloud_secret</code>, issued by the site operator. These are separate from player credentials. A registration owns its announced host/port. See <a href="/documentation/accounts/">server registration</a>.</p>
   <p>The game server handles these calls automatically when public listing and sharing are enabled. They are described here for integrations. Requests are bound to the caller’s public IP and UDP port. An optional <code>host</code> must resolve to that IP when hostname announcements are enabled. A listed server must announce before reporting a match or live replay.</p>
   <p>Announce about every 60 seconds. A normal announcement is checked by querying the game server over UDP; verified values replace the submitted status. The game port must be reachable. Entries expire after 180 seconds by default if announcements stop.</p>
   <pre class="code"><code>curl 'https://openfp.retrocs.org/api/' \
   --data-urlencode 'action=announce' \
++  --data-urlencode 'cloud_server=YOUR_REGISTRATION' \
++  --data-urlencode 'cloud_secret=YOUR_SECRET' \
   --data-urlencode 'port=29870' \
   --data-urlencode 'name=My OpenFP server' \
   --data-urlencode 'mode=versus' \
@@ -75,8 +91,8 @@ curl 'https://openfp.retrocs.org/api/?action=matches&amp;limit=10'</code></pre>
   <h3>POST action=match</h3>
   <p>Fields: <code>port</code>, optional <code>host</code>, <code>seconds</code>, <code>mode</code>, <code>world</code>, <code>map</code>, <code>goal</code>, <code>winner</code>, <code>players</code> and optional <code>replay</code>. Winner is <code>camp</code>, <code>fortress</code>, <code>draw</code> or <code>none</code>. The server must already be listed. At least one player result is required, with a maximum of eight.</p>
   <p>Each player occupies a newline-separated row with these tab-separated fields:</p>
-  <pre class="code"><code>name  side  won  kills  score  rating  change  bot  [tank]  [ach]</code></pre>
-  <p>Side is <code>camp</code> or <code>fortress</code>; won and bot are 0/1. Name ≤15 characters, rating 0–4000, change −100 to 100. Optional legacy tank IDs are 0–2; <code>ach</code> is a 16-bit achievement mask. Replay text must begin with <code>OFPREPLAY 1</code> or <code>OFPREPLAY 2</code> and be ≤3,000,000 bytes. Invalid optional replay data is omitted while the match result is still stored. Success: <code>ok match ID</code>.</p>
+  <pre class="code"><code>name  side  won  kills  score  rating  change  bot  tank  ach  account_id</code></pre>
+  <p>Human results require the verified 32-character <code>account_id</code>; the canonical username replaces the submitted name. Bots leave this field empty. Side is <code>camp</code> or <code>fortress</code>; won and bot are 0/1. Name ≤15 characters, rating 0–4000, change −100 to 100. Optional legacy tank IDs are 0–2; <code>ach</code> is a 16-bit achievement mask. Replay text must begin with <code>OFPREPLAY 1</code> or <code>OFPREPLAY 2</code> and be ≤3,000,000 bytes. Invalid optional replay data is omitted while the match result is still stored. Success: <code>ok match ID</code>.</p>
   <h3>POST action=live</h3>
   <p>Fields: <code>port</code>, optional <code>host</code>, and <code>replay</code> (≤3,000,000 bytes, valid replay header). Replaces the listed server’s shared live replay. Send <code>over=1</code> instead of a replay when the match ends. Responses: <code>ok live</code> or <code>ok over</code>.</p>
 

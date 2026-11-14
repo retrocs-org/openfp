@@ -91,6 +91,21 @@ function ofp_migrations(): array
                host VARCHAR(128) NOT NULL, port INT UNSIGNED NOT NULL, ip VARCHAR(64) NOT NULL, cport INT UNSIGNED NOT NULL,
                at INT UNSIGNED NOT NULL, KEY punch_server (host, port, at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         ]],
+        14 => ['cloud accounts, device sign-in and verified player statistics (0.1)', [
+            "ALTER TABLE servers ADD COLUMN IF NOT EXISTS cloud_server VARCHAR(32)",
+            "CREATE TABLE IF NOT EXISTS accounts (id CHAR(32) NOT NULL PRIMARY KEY, username VARCHAR(15) NOT NULL, username_key VARCHAR(15) NOT NULL UNIQUE, email VARCHAR(254) NOT NULL UNIQUE, password_hash VARCHAR(255) NOT NULL, player_key CHAR(64) NOT NULL, created BIGINT NOT NULL, password_changed BIGINT NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS account_sessions (token_hash CHAR(64) NOT NULL PRIMARY KEY, account_id CHAR(32) NOT NULL, expires BIGINT NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS account_tickets (token_hash CHAR(64) NOT NULL PRIMARY KEY, account_id CHAR(32) NOT NULL, server VARCHAR(32) NOT NULL, server_id CHAR(32) NOT NULL, nonce CHAR(16) NOT NULL, key_id CHAR(32) NOT NULL, expires BIGINT NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS account_resets (token_hash CHAR(64) NOT NULL PRIMARY KEY, account_id CHAR(32) NOT NULL, expires BIGINT NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS account_devices (token_hash CHAR(64) NOT NULL PRIMARY KEY, pin CHAR(8) NOT NULL UNIQUE, expires BIGINT NOT NULL, account_id CHAR(32)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS account_limits (bucket CHAR(64) NOT NULL PRIMARY KEY, started BIGINT NOT NULL, attempts INT NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS account_results (match_id BIGINT NOT NULL, account_id CHAR(32) NOT NULL, won INT NOT NULL, kills INT NOT NULL, score BIGINT NOT NULL, PRIMARY KEY(match_id, account_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE INDEX IF NOT EXISTS sessions_account ON account_sessions (account_id)",
+            "CREATE INDEX IF NOT EXISTS results_account ON account_results (account_id)",
+            "CREATE INDEX IF NOT EXISTS tickets_expires ON account_tickets (expires)",
+            "CREATE INDEX IF NOT EXISTS sessions_expires ON account_sessions (expires)",
+
+        ]],
     ];
 }
 

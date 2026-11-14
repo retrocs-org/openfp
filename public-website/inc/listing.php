@@ -43,7 +43,7 @@ function ofp_create_tables(PDO $db): void
 }
 
 // the game's UDP query: header 'O' 'F' protocol type, then the answer (see src/common/net.c)
-const OFP_PROTOCOL = 38;   // (servers of 8 read it too: newer packets are read, and any server answers a query)
+const OFP_PROTOCOL = 40;   // (servers of 8 read it too: newer packets are read, and any server answers a query)
 const OFP_QUERY = 18;
 const OFP_INFO = 19;
 
@@ -115,7 +115,8 @@ function ofp_list(): array
     $cfg = ofp_config();
     $db = ofp_db();
     ofp_expire();
-    $hide = in_array('hidden', ofp_columns('servers'), true) ? ' WHERE hidden = 0' : '';   // (join-code only: not listed)
+    $hide = in_array('hidden', ofp_columns('servers'), true) ? ' WHERE hidden = 0' : '';
+    if (in_array('cloud_server',ofp_columns('servers'),true)) $hide .= ($hide ? ' AND' : ' WHERE') . ' cloud_server IS NOT NULL';   // (join-code only: not listed)
     $servers = $db->query("SELECT * FROM servers$hide ORDER BY players DESC, name")->fetchAll();
     $hours = (int)$cfg['history_hours'];
     $since = time() - $hours * 3600;
@@ -334,6 +335,7 @@ function ofp_store_match(array $m, ?string $replay): int
     $old = $db->prepare('SELECT id FROM matches WHERE (host = ? AND port = ? AND id <= ?) OR ended < ?');
     $old->execute([$m['host'], $m['port'], $id - 500, time() - 90 * 86400]);
     foreach ($old->fetchAll(PDO::FETCH_COLUMN) as $gone) {
+        $db->prepare('DELETE FROM account_results WHERE match_id = ?')->execute([$gone]);
         $db->prepare('DELETE FROM replays WHERE match_id = ?')->execute([$gone]);
         $db->prepare('DELETE FROM matches WHERE id = ?')->execute([$gone]);
     }
@@ -512,7 +514,7 @@ function ofp_forget(string $name, ?string $host = null, ?int $port = null): arra
     $up = $db->prepare('UPDATE matches SET players = ? WHERE id = ?');
     foreach ($q->fetchAll() as $m) {
         $ps = json_decode($m['players'], true) ?: [];
-        foreach ($ps as &$p) if (!strcasecmp($p['name'], $name)) { $p['name'] = 'a player'; $p['ach'] = 0; }
+        foreach ($ps as &$p) if (!strcasecmp($p['name'], $name)) { $p['name'] = 'a player'; $p['ach'] = 0; unset($p['account_id']); }
         unset($p);
         $up->execute([json_encode($ps), $m['id']]);
         $n['matches']++;
@@ -521,6 +523,12 @@ function ofp_forget(string $name, ?string $host = null, ?int $port = null): arra
         $q = $db->prepare("UPDATE gallery SET author = '' WHERE author = ?");
         $q->execute([$name]);
         $n['maps'] = $q->rowCount();
+        $q=$db->prepare('SELECT id FROM accounts WHERE username_key = ?');$q->execute([strtolower($name)]);$id=$q->fetchColumn();
+        if ($id) {
+            foreach (['account_results','account_sessions','account_tickets','account_resets','account_devices'] as $table)
+                $db->prepare("DELETE FROM $table WHERE account_id = ?")->execute([$id]);
+            $db->prepare('DELETE FROM accounts WHERE id = ?')->execute([$id]);
+        }
     }
     return $n;
 }

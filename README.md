@@ -34,7 +34,7 @@ AmigaOS requires a 68040 or 68060, AmigaOS 3.x, 2 MB Chip RAM and at least
 | Lay mine | `,` | E |
 
 Keyboard bindings and controllers can be configured in Settings.
-See the [game guide](docs/GAME.md) for Amiga controls and all game options.
+See the [game guide](docs/GAME.md) for Amiga controls and all game options, and [cloud accounts](docs/ACCOUNTS.md) for public-server sign-in and Apple TV pairing.
 
 ## Build from source
 

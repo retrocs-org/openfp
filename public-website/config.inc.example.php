@@ -23,6 +23,27 @@ return [
         'ofp_match'      => '',
     ],
 
+    // Cloud accounts use HTTPS only, independently of the legacy listing API.
+    'accounts' => [
+        'enabled' => true,
+        'session_days' => 30,
+        // Register each public dedicated server. Generate its secret and hash with:
+        // php inc/cloud-server.php SERVER_NAME
+        'servers' => [
+            // 'retrocs-main' => 'SHA256_OF_SERVER_SECRET',
+        ],
+    ],
+    // An empty host or sender automatically disables password recovery.
+    'smtp' => [
+        'host' => '', 'port' => 587,
+        'encryption' => 'starttls', // starttls, tls (implicit TLS, usually 465), or none
+        'username' => '', 'password' => '', // optional relay authentication
+        'from' => '', 'from_name' => 'OpenFP',
+        'ehlo' => 'localhost', // this sender's hostname, sent in EHLO
+        'bind' => '', // optional local sender IP:port, e.g. 192.0.2.10:0 or [2001:db8::10]:0
+        'timeout' => 10,
+    ],
+
     // php inc/migrate.php: who may change the tables (only what differs from 'db'; leave out to use 'db')
     // 'db_admin' => ['user' => 'root', 'password' => '...'],
 

@@ -254,7 +254,13 @@ if ($action === 'punch') {
         implode(', ', array_fill(0, count($ports), '(?, ?, ?, ?, ?)')))->execute($values);
     reply(200, 'ok');
 }
-if ($action === 'punches') {                             // a server: who wants in (their address and port, a line each)
+if ($action === 'punches') {
+    require_once __DIR__.'/../inc/accounts.php';
+    if (!ofp_account_https() || !ofp_cloud_server((string)($_POST['cloud_server']??''),(string)($_POST['cloud_secret']??''))) reply(403,'registered cloud server required');
+    $q=$db->prepare('SELECT cloud_server FROM servers WHERE host = ? AND port = ?');
+    $q->execute([announced_host($ip,$cfg),(int)($_POST['port']??0)]);
+    if ($q->fetchColumn() !== (string)($_POST['cloud_server']??'')) reply(403,'server registration does not match');
+    // a server: who wants in (their address and port, a line each)
     $sport = (int)($_POST['port'] ?? 0);
     if ($sport < 1 || $sport > 65535) reply(400, 'bad port');
     $key = [announced_host($ip, $cfg), $sport, time() - 30];
@@ -350,9 +356,17 @@ if ($action === 'map_upload') {                          // a player shares a ma
     reply(200, 'ok map ' . $mid);
 }
 
+if (in_array($action, ['announce','match','live','remove','punches'], true)) {
+    require_once __DIR__.'/../inc/accounts.php';
+    if (!ofp_account_https() || !ofp_cloud_server((string)($_POST['cloud_server']??''),(string)($_POST['cloud_secret']??'')))
+        reply(403,'registered cloud server required');
+}
 $port = (int)($_POST['port'] ?? 0);
 if ($port < 1 || $port > 65535) reply(400, 'bad port');
 $host = announced_host($ip, $cfg);
+$q=$db->prepare('SELECT cloud_server FROM servers WHERE host = ? AND port = ?');
+$q->execute([$host,$port]); $owner=$q->fetchColumn();
+if ($owner !== false && $owner !== null && $owner !== (string)($_POST['cloud_server']??'')) reply(403,'server registration does not match');
 
 if ($action === 'live') {                               // a listed server's match so far (or: it's over)
     $q = $db->prepare('SELECT 1 FROM servers WHERE host = ? AND port = ?');
@@ -382,12 +396,24 @@ if ($action === 'match') {                              // a listed server's fin
                       'kills' => max(0, (int)$f[3]), 'score' => (int)$f[4], 'rating' => max(0, min(4000, (int)$f[5])),
                       'change' => max(-100, min(100, (int)$f[6])), 'bot' => (int)$f[7],
                       'tank' => isset($f[8]) ? max(0, min(2, (int)$f[8])) : null,          // (0.4: the tank,
+                      'account_id' => $f[10] ?? '',
                       'ach' => isset($f[9]) ? (int)$f[9] & 0xFFFF : 0];                    //  achievements just earned)
     }
     if (!$players) reply(400, 'no players');
+    $seenAccounts=[];
+    foreach ($players as &$player) {
+        if ($player['bot']) continue;
+        $q=$db->prepare('SELECT username FROM accounts WHERE id = ?'); $q->execute([$player['account_id']]);
+        $canonical=$q->fetchColumn();
+        if (!$canonical || isset($seenAccounts[$player['account_id']])) reply(400,'unknown or duplicate cloud account in match');
+        $seenAccounts[$player['account_id']]=true;
+        $player['name']=$canonical;
+    }
+    unset($player);
     $replay = $_POST['replay'] ?? null;
     if ($replay !== null && (strlen($replay) > 3000000 || preg_match('/\AOFPREPLAY [12]\r?\n/', $replay) !== 1)) $replay = null;
     $before = ofp_ladder_leaders($host, $port);
+    $db->beginTransaction();
     $id = ofp_store_match([
         'host' => $host, 'port' => $port, 'server_name' => $server_name, 'seconds' => max(0, min(86400, (int)($_POST['seconds'] ?? 0))),
         'mode' => ($_POST['mode'] ?? '') === 'versus' ? 'versus' : 'together', 'world' => ofp_clean($_POST['world'] ?? '', 15),
@@ -395,6 +421,10 @@ if ($action === 'match') {                              // a listed server's fin
         'goal' => isset(OFP_GOALS[$_POST['goal'] ?? '']) ? $_POST['goal'] : 'flag',
         'players' => $players,
     ], $replay);
+    foreach ($players as $player) if (!$player['bot'])
+        $db->prepare('INSERT INTO account_results(match_id, account_id, won, kills, score) VALUES(?, ?, ?, ?, ?)')
+           ->execute([$id,$player['account_id'],$player['won'],$player['kills'],$player['score']]);
+    $db->commit();
     foreach (ofp_ladder_leaders($host, $port) as $slug => [$lname, $leader])   // a new leader?
         if ($leader !== null && ($before[$slug][1] ?? null) !== $leader)
             ofp_webhook('ladder', "$leader now leads $lname. " . (ofp_settings()['site']['base_url'] ?? '') . "/statistics/?view=ladders&l=$slug");
@@ -433,6 +463,7 @@ $is_new = !$q->fetchColumn();
 $matches = max(0, min(1000000, (int)($_POST['matches'] ?? 0)));
 $uptime = max(0, min(10 * 365 * 86400, (int)($_POST['uptime'] ?? 0)));
 ofp_store_server([
+    'cloud_server' => (string)$_POST['cloud_server'],
     'host' => $host, 'port' => $port, 'name' => $info['name'], 'build' => $info['build'], 'players' => $info['players'],
     'max_players' => $info['max_players'], 'password' => $info['password'], 'running' => $info['running'],
     'match_players' => $info['match_players'], 'mode' => $info['versus'] ? 'versus' : 'together',
@@ -460,7 +491,7 @@ ofp_store_server([
 if ($is_new && empty($_POST['hidden'])) ofp_webhook('server_new', "A new server on the list: {$info['name']} ($host:$port). "
                          . (ofp_settings()['site']['base_url'] ?? '') . '/server/');
 // its leaderboard, for the web site
-if (isset($_POST['leaders'])) ofp_store_leaders($host, $port, $info['name'], (string)$_POST['leaders']);
+if (empty($_POST['hidden']) && isset($_POST['leaders'])) ofp_store_leaders($host, $port, $info['name'], (string)$_POST['leaders']);
 // a sample for the charts, every few minutes
 $q = $db->prepare('SELECT MAX(at) FROM samples WHERE host = ? AND port = ?');
 $q->execute([$host, $port]);

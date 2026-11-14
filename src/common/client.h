@@ -25,6 +25,7 @@ typedef struct {
     uint8_t    key[32];              /* this player's own secret key (settings.ini keeps it) */
     uint64_t   cookie;               /* the server's proof-of-address token */
     uint8_t    server_id[16];
+    char       cloud_server[33], cloud_ticket[65];
     int        send_verifier;        /* the server asked us to register our key */
     uint32_t   live_first;           /* the oldest tick in the latest live TICKS */
     uint32_t   catch_to;             /* a rejoin: the match was at this tick */

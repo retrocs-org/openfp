@@ -3,6 +3,7 @@
  * A part of the Amiga client, its own translation unit: what the parts share is in internal.h. */
 #include "platform/amiga/local/internal.h"
 #include "common/credits.h"
+#include "common/cloud.h"
 static uint32_t credits_start;
 
 const char *const world_names[] = { "CLASSIC", "DESERT", "JUNGLE", "WINTER", "SCI-FI", "VOLCANO", "WASTELAND", "MOON BASE", "SWAMP" };
@@ -11,7 +12,7 @@ AmigaMenuSettings settings;
 AmigaPublicList public_list;
 int public_tab = 1, public_checked, public_failed;
 static SavedServer browser[AMIGA_SERVERS];
-char online_status[96], edit_text[AMIGA_ADDRESS];
+char online_status[96], edit_text[256];
 static char connected_address[AMIGA_ADDRESS], last_direct[AMIGA_ADDRESS];
 static int order_seat;
 int orders_available(void) {
@@ -54,6 +55,10 @@ static int remap_capture, remap_player;
 static uint8_t remap_keys[6];
 static int profile_action, profile_slot;
 static AmigaProfile profile_draft;
+static int cloud_form, cloud_create;
+static char cloud_user[16], cloud_email[255], cloud_password[73];
+static char *cloud_text_field(void) {return menu_row==1?cloud_user:menu_row==2?cloud_email:cloud_password;}
+static size_t cloud_text_cap(void) {return menu_row==1?sizeof cloud_user:menu_row==2?sizeof cloud_email:sizeof cloud_password;}
 int online_dirty = 1, online_enter, online_escape, online_refresh;
 uint32_t local_tick, local_draw;
 
@@ -68,7 +73,7 @@ enum { PROFILE_USE, PROFILE_EDIT, PROFILE_DELETE, PROFILE_ACTIONS };
 enum { SERVER_JOIN, SERVER_EDIT, SERVER_DELETE };
 enum { SERVER_FORM_NONE, SERVER_FORM_ADD, SERVER_FORM_EDIT, SERVER_FORM_DIRECT, SERVER_FORM_DELETE };
 static int server_action, server_form, server_slot, server_confirm;
-enum { EDIT_NAME, EDIT_FACE, EDIT_TANK, EDIT_STEER, EDIT_SAVE, EDIT_BACK, EDIT_ROWS };
+enum { EDIT_ACCOUNT, EDIT_NAME, EDIT_FACE, EDIT_TANK, EDIT_STEER, EDIT_SAVE, EDIT_BACK, EDIT_ROWS };
 enum { P1_INPUT, P1_JOY, P1_KEYS, P2_INPUT, P2_JOY, P2_KEYS, CONTROLS_BACK, CONTROLS_RESET, CONTROL_ROWS };
 enum { KEYS_FIRST, KEYS_LAST = KEYS_FIRST + 5, KEYS_SAVE, KEYS_BACK, KEYS_ROWS };
 
@@ -314,6 +319,10 @@ int profile_menu_active(void)
 
 void profile_back(void)
 {
+    if (cloud_form) {
+        menu_edit=cloud_form=0;menu_row=EDIT_ACCOUNT;memset(cloud_password,0,sizeof cloud_password);memset(edit_text,0,sizeof edit_text);
+        ModifyIDCMP(window, RAW_EVENTS);online_dirty=1;return;
+    }
     if (menu_edit) {
         menu_edit = 0;
         online_status[0] = 0;
@@ -393,7 +402,7 @@ int menu_rows(void)
     case MENU_CHALLENGES: return 4;
     case MENU_TOOLS: return sizeof tool_items / sizeof tool_items[0];
     case MENU_SETTINGS: return sizeof setting_items / sizeof setting_items[0];
-    case MENU_PROFILE_EDIT: return EDIT_ROWS;
+    case MENU_PROFILE_EDIT: return cloud_form ? 6 : EDIT_ROWS;
     case MENU_PROFILE_DELETE: return 2;
     case MENU_DIAGNOSTICS: return 2;
     case MENU_CONTROLS: return CONTROL_ROWS;
@@ -422,7 +431,7 @@ static void menu_move(int delta)
         return;
     }
     if (!lobby && (menu_page == MENU_CONTROLS || menu_page == MENU_KEYMAP ||
-                               menu_page == MENU_PROFILE_EDIT)) {
+                                (menu_page == MENU_PROFILE_EDIT && !cloud_form))) {
         /* The two buttons share one row. Enter that row on the left. */
         rows--;
         if (menu_row == rows) menu_row--;
@@ -499,6 +508,8 @@ void menu_side_step(int dir)
             online_status[0] = 0;
         }
     } else if (menu_page == MENU_PROFILE_EDIT) {
+        if (cloud_form) {if(menu_row==0) cloud_create=!cloud_create;online_dirty=1;return;}
+        if (menu_row == EDIT_ACCOUNT) { profile_accept(); return; }
         if (menu_row == EDIT_FACE) profile_draft.face = (profile_draft.face + FACES + dir) % FACES;
         if (menu_row == EDIT_TANK) {
             int classic = local_classic(), count = TANK_CLASS_COUNT + !classic + 1;
@@ -676,7 +687,11 @@ static int commit_profile(const AmigaProfile *next, int current)
     int previous_current = settings.current;
     settings.profile[profile_slot] = *next;
     settings.current = current;
-    if (!amiga_settings_save(&settings)) return 1;
+    if (!amiga_settings_save(&settings)) {
+        if (previous.session[0] && memcmp(previous.key,next->key,32)) cloud_forget(previous.key);
+        if (next->session[0]) cloud_register(next->key,next->session);
+        return 1;
+    }
     settings.profile[profile_slot] = previous;
     settings.current = previous_current;
     strcpy(online_status, "COULD NOT SAVE PROFILE");
@@ -685,6 +700,30 @@ static int commit_profile(const AmigaProfile *next, int current)
 
 void profile_accept(void)
 {
+    if (cloud_form) {
+        if(menu_edit) {snprintf(cloud_text_field(),cloud_text_cap(),"%.*s",(int)cloud_text_cap()-1,edit_text);memset(edit_text,0,sizeof edit_text);menu_edit=0;ModifyIDCMP(window,RAW_EVENTS);}
+        else if(menu_row==0) cloud_create=!cloud_create;
+        else if(menu_row==5) {profile_back();return;}
+        else if(menu_row==4) {
+            CloudAccount account;char error[96];
+            strcpy(online_status,"CONNECTING TO CLOUD ACCOUNT...");online_dirty=1;
+            if(!cloud_login(&account,cloud_user,cloud_email,cloud_password,cloud_create,error)) {
+                memcpy(profile_draft.key,account.key,32);profile_draft.has_key=1;
+                strcpy(profile_draft.session,account.session);strcpy(profile_draft.name,account.name);
+                cloud_form=0;menu_row=EDIT_FACE;strcpy(online_status,"CLOUD ACCOUNT CONNECTED");
+            } else snprintf(online_status,sizeof online_status,"%s",error);
+            memset(cloud_password,0,sizeof cloud_password);
+        } else if(menu_row!=2||cloud_create) {
+            snprintf(edit_text,sizeof edit_text,"%s",cloud_text_field());menu_edit=1;
+            ModifyIDCMP(window,RAW_EVENTS|IDCMP_VANILLAKEY);
+        }
+        online_dirty=1;return;
+    }
+    if(menu_page==MENU_PROFILE_EDIT&&!menu_edit&&menu_row==EDIT_ACCOUNT) {
+        cloud_form=1;cloud_create=0;menu_row=0;online_status[0]=0;
+        snprintf(cloud_user,sizeof cloud_user,"%s",profile_draft.session[0]?profile_draft.name:"");
+        cloud_email[0]=cloud_password[0]=0;online_dirty=1;return;
+    }
     if (menu_page == MENU_SIGNIN) {
         int slot;
         if (!join_count) return;
@@ -730,7 +769,7 @@ void profile_accept(void)
         menu_edit = 0;
         online_status[0] = 0;
         ModifyIDCMP(window, RAW_EVENTS);
-    } else if (menu_row == EDIT_NAME) {
+    } else if (menu_row == EDIT_NAME && !profile_draft.session[0]) {
         strcpy(edit_text, profile_draft.name);
         menu_edit = 1;
         online_status[0] = 0;
@@ -776,7 +815,7 @@ static void remap_key(UWORD code)
 static void menu_text_key(UWORD code)
 {
     size_t n = strlen(edit_text);
-    size_t limit = editing_team >= 0 ? sizeof team_names[0] : menu_page == MENU_PROFILE_EDIT ? NET_NAME : AMIGA_ADDRESS;
+    size_t limit = cloud_form ? cloud_text_cap() : editing_team >= 0 ? sizeof team_names[0] : menu_page == MENU_PROFILE_EDIT ? NET_NAME : AMIGA_ADDRESS;
     if ((code == 8 || code == 127) && n) edit_text[n - 1] = 0;
     else if (code >= 32 && code <= 126 && n + 1 < limit) {
         edit_text[n] = (char)code;
@@ -1727,19 +1766,34 @@ static void option_volume(int row, int right, int y, const char *name, int level
 static void draw_profile_edit(void)
 {
     int creating = !settings.profile[profile_slot].name[0];
+    if(cloud_form) {
+        char value[36];int row;
+        local_logo();console_panel(8,68,311,240,PANEL);label(17,83,GOLD,"CLOUD PROFILE");
+        for(row=0;row<6;row++) {
+            const char *title=row==0?"ACCOUNT":row==1?"USERNAME":row==2?"EMAIL":row==3?"PASSWORD":row==4?(cloud_create?"CREATE ACCOUNT":"SIGN IN"):"CANCEL";
+            const char *v=row==0?(cloud_create?"CREATE NEW":"SIGN IN"):row==1?cloud_user:row==2?cloud_email:row==3?(cloud_password[0]?"********":""):"";
+            if(row==2&&!cloud_create) continue;
+            if(menu_edit&&menu_row==row) v=row==3?"********":edit_text;
+            snprintf(value,sizeof value,"%.18s",v);
+            option_row(row,15,304,103+row*20,title,value);
+        }
+        if(online_status[0]) {snprintf(value,sizeof value,"%.35s",online_status);label(17,231,GOLD,value);}
+        return;
+    }
     int pick = local_classic() ? tank_chassis(profile_draft.tank) : profile_draft.tank;
     const char *tank = pick < 0 ? "DEFAULT" : pick == TANK_RHINO ? "RHINO" : tank_stats[pick].name;
     int icon_tank = pick < 0 ? profile_tank(join_player) : pick;
     local_logo();
     console_panel(8, 68, 311, 204, PANEL);
     label(17, 83, GOLD, creating ? "NEW PROFILE" : "EDIT PROFILE");
-    option_row(EDIT_NAME, 15, 304, 100, "NAME", profile_draft.name[0] ? profile_draft.name : "ENTER NAME");
-    option_band(EDIT_FACE, 15, 304, 109, 137, 126, "AVATAR", NULL);
-    draw_face(272, 111, profile_draft.face);
-    option_band(EDIT_TANK, 15, 304, 142, 175, 162, "FAVORITE TANK", NULL);
-    label(259 - (int)strlen(tank) * 8, 162, menu_row == EDIT_TANK ? INK : GOLD, tank);
-    draw_tank_icon(265, 143, join_player, icon_tank);
-    option_row(EDIT_STEER, 15, 304, 190, "STEERING", profile_draft.steer > 0 ? "ORIGINAL" : "TANK");
+    option_row(EDIT_ACCOUNT, 15, 304, 98, "PROFILE TYPE", profile_draft.session[0] ? "CLOUD >" : "LOCAL / CLOUD >");
+    option_row(EDIT_NAME, 15, 304, 116, "NAME", profile_draft.name[0] ? profile_draft.name : "ENTER NAME");
+    option_band(EDIT_FACE, 15, 304, 123, 149, 139, "AVATAR", NULL);
+    draw_face(272, 124, profile_draft.face);
+    option_band(EDIT_TANK, 15, 304, 153, 184, 172, "FAVORITE TANK", NULL);
+    label(259 - (int)strlen(tank) * 8, 172, menu_row == EDIT_TANK ? INK : GOLD, tank);
+    draw_tank_icon(265, 154, join_player, icon_tank);
+    option_row(EDIT_STEER, 15, 304, 200, "STEERING", profile_draft.steer > 0 ? "ORIGINAL" : "TANK");
     console_panel(8, 210, 311, 240, PANEL);
     option_row(EDIT_SAVE, 15, 191, 228, creating ? "CREATE PROFILE" : "SAVE", NULL);
     option_row(EDIT_BACK, 199, 304, 228, "CANCEL", NULL);
@@ -2581,6 +2635,7 @@ static void connect_server(const char *address, int locked)
         profile->has_key = 1;
         save_menu_settings();
     }
+    if(profile->session[0]) cloud_register(profile->key,profile->session);
     if (netc_open(&online, host, port, profile->name, "", profile->key,
                   profile->tank < 0 ? TANK_MEDIUM : profile->tank == TANK_RHINO ? TANK_HEAVY : profile->tank,
                   menu_steer) != 0)

@@ -57,6 +57,12 @@ map             =                 # one map file for every match
 maps            =                 # a folder of .ofpmap files, played in turn
 rotation        = order           # order, random, or vote (the players choose in the lobby)
 
+# Public servers require registered cloud accounts. Generate credentials on the website:
+# php inc/cloud-server.php retrocs-main
+# Add the printed hash to config.inc.php and these values here (do not publish the secret).
+cloud_server =
+cloud_secret =
+
 # ---- computer players -----------------------------------------------------------------------
 allow_bots      = yes             # computer players in a match (0-7; fill_bots: up to what the map holds)
 bots            = 0               # always this many (0-7) on top of the people (up to what the map holds)

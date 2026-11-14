@@ -8,6 +8,7 @@
 #include "common/http.h"
 #endif
 #include "common/rules.h"
+#include "common/cloud.h"
 #include "common/sha256.h"
 
 #define NC_GIVE_UP_MS 12000
@@ -131,6 +132,7 @@ static void send_hello(NetClient *c)
     if (c->send_verifier) pk_bytes(&k, v, 32);
     pk_u8(&k, NET_PROTOCOL_OLDEST);                      /* the oldest protocol we still speak */
     pk_u32(&k, net_rules());                             /* what our game computes (0 from older builds: not said) */
+    pk_str(&k, c->cloud_ticket, 64);
     while (k.n < 160) pk_u8(&k, 0);                      /* never smaller than the answers it gets */
     send_pack(c, &k);
 }
@@ -444,7 +446,22 @@ static void handle(NetClient *c, uint8_t *buf, int n)
         uk_bytes(&k, c->server_id, 16);
         (void)uk_u8(&k);
         if (k.bad || c->state != NC_CONNECTING) return;
-        c->cookie = lo | hi << 32;
+        {
+            uint64_t cookie = lo | hi << 32;
+            char server[33];
+            uk_str(&k, server, sizeof server);
+            if (k.bad) return;
+            if (server[0] && (cookie != c->cookie || !c->cloud_ticket[0])) {
+                uint8_t v[32], id[16];
+                my_verifier(c, v, id);
+                if (cloud_join_ticket(c->key, server, c->server_id, cookie, id, c->cloud_ticket, c->status)) {
+                    c->state = NC_FAILED; c->reason = NR_CLOUD; return;
+                }
+                c->heard = net_ms();
+            }
+            c->cookie = cookie;
+            snprintf(c->cloud_server, sizeof c->cloud_server, "%s", server);
+        }
         send_hello(c);
         break;
     }
@@ -795,6 +812,7 @@ static void handle(NetClient *c, uint8_t *buf, int n)
             break;
         }
         snprintf(c->status, sizeof c->status, "%s", r == NR_FULL ? "the server is full"
+                 : r == NR_CLOUD ? "Cloud sign-in expired or refused. Sign in again."
                  : r == NR_TOO_MANY ? "too many players from your address" : r == NR_KEY ? "that name or key belongs to someone else"
                  : r == NR_VERSION ? "a different version of the game" : r == NR_PASSWORD ? "wrong password"
                  : r == NR_KICKED ? "you were removed from the server" : "the server closed");
@@ -922,7 +940,7 @@ int netc_can_retry(const NetClient *c)
 {
     return c->state == NC_FAILED && c->reason != NR_PASSWORD && c->reason != NR_KICKED && c->reason != NR_KEY &&
            c->reason != NR_VERSION && c->reason != NR_FULL && c->reason != NR_TOO_MANY && c->reason != NR_DESYNC &&
-           c->reason != NR_RULES;
+           c->reason != NR_RULES && c->reason != NR_CLOUD;
 }
 
 void netc_fuzz_packet(NetClient *c, const uint8_t *buf, int n)

@@ -3,6 +3,8 @@
 require __DIR__ . '/../../inc/documentation.php';
 documentation_start('clients');
 ?>
+<p>For public servers, <a href="/documentation/accounts/">sign in with a cloud account</a>. Desktop and AmigaOS clients use username and password; Apple TV uses a pairing PIN. Local profiles remain available for local and private-server games.</p>
+
 <h2 id="installation">Install a client</h2>
 <p>Get a published package from <a href="/#get">Get the game</a>. While the game is unreleased, <a href="/source/">build it from source</a>.</p>
 <ul>

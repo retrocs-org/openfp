@@ -453,6 +453,7 @@ static void test_versions(void)
         pk_u8(&p, 0);                                    /* no verifier */
         pk_u8(&p, oldest[k]);
         pk_u32(&p, rules[k]);
+        pk_str(&p, "", 64);                             /* no cloud ticket */
         pk_u8(&p, 0xEE); pk_u8(&p, 0xEE);                /* fields from the future */
         while (p.n < 160) pk_u8(&p, 0);
         net_send(sock, &to, pkt, p.n);

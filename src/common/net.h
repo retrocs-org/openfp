@@ -14,8 +14,8 @@
  * NET_PROTOCOL_OLDEST (older builds read what they know and ignore the rest); only a
  * change that breaks a message raises it. Two builds talk if each one's protocol is at
  * least the other's oldest. */
-#define NET_PROTOCOL        39  /* 39: arena starts independent of team slot order; 38: ice, oil and optional power-ups; 37: world vehicles and match lives; 36: Classic matches stay clear; 35: snow, fog, sandstorms and clouds; 34: rain weather; 33: the server supplies bot inputs; 32: independent turrets and custom team areas; 31: authored roads through generated camps; 30: arenas' supply drop in the same place on every compiler (clang, gcc); 29: the checksum: the map's own area (any grid size: the Amiga's 128); 28: kill confirmed, hardpoint; compact bases on small maps, their country split; 27: 8 players together against the computer: no ninth tank (the match's 8 slots); 26: a side all out loses, patrols on the roads; 25: repairs in the field, changing weather, smarter computer players; 24: storms of their own, smarter computer players; 23: conquest's country guns, each half its side's; 22: map sizes (a random battlefield's in the setup); 21: a fortress of four garages (4 vs 4); 20: four new worlds (the swamp's mud, the moon's slide); 19: matches of up to 8; 18: supply drops, the computer players' levels, the ballot; 17: deathmatch ties, warlord escorts and arenas; 16: team deathmatch in arenas, halves; 15: arenas (annihilation: no camps, spawn points); 14: warlord; 13: team deathmatch, every tank for itself; */
-#define NET_PROTOCOL_OLDEST 39  /*    12: conquest and annihilation (rule changes, all of them) */
+#define NET_PROTOCOL        40  /* 39: arena starts independent of team slot order; 38: ice, oil and optional power-ups; 37: world vehicles and match lives; 36: Classic matches stay clear; 35: snow, fog, sandstorms and clouds; 34: rain weather; 33: the server supplies bot inputs; 32: independent turrets and custom team areas; 31: authored roads through generated camps; 30: arenas' supply drop in the same place on every compiler (clang, gcc); 29: the checksum: the map's own area (any grid size: the Amiga's 128); 28: kill confirmed, hardpoint; compact bases on small maps, their country split; 27: 8 players together against the computer: no ninth tank (the match's 8 slots); 26: a side all out loses, patrols on the roads; 25: repairs in the field, changing weather, smarter computer players; 24: storms of their own, smarter computer players; 23: conquest's country guns, each half its side's; 22: map sizes (a random battlefield's in the setup); 21: a fortress of four garages (4 vs 4); 20: four new worlds (the swamp's mud, the moon's slide); 19: matches of up to 8; 18: supply drops, the computer players' levels, the ballot; 17: deathmatch ties, warlord escorts and arenas; 16: team deathmatch in arenas, halves; 15: arenas (annihilation: no camps, spawn points); 14: warlord; 13: team deathmatch, every tank for itself; */
+#define NET_PROTOCOL_OLDEST 40  /*    12: conquest and annihilation (rule changes, all of them) */
 #ifndef OFP_VERSION
 /* Release version changes only by an explicit new-version decision. */
 #define OFP_VERSION "0.1"
@@ -81,7 +81,7 @@ enum { NM_HELLO = 1, NM_CHALLENGE, NM_WELCOME, NM_PING, NM_LOBBY, NM_CHAT, NM_LE
 enum { NR_FULL = 1, NR_VERSION, NR_DESYNC, NR_TIMEOUT, NR_ENDED, NR_PASSWORD, NR_KICKED, NR_SHUTDOWN,
        NR_KEY,           /* the player key didn't match the one this name/key registered with */
        NR_TOO_MANY,      /* too many players from one address */
-       NR_RULES };       /* the same protocol, but the game computes differently (common/rules.h) */
+       NR_RULES, NR_CLOUD };       /* the same protocol, but the game computes differently (common/rules.h) */
 
 /* A QUERY must be at least this long (padded with zeros): the answer is never
  * bigger than the question, so a forged sender address can't be used to make a

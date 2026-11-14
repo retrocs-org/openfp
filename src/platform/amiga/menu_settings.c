@@ -119,6 +119,10 @@ void amiga_settings_load(AmigaMenuSettings *s)
             i = line[1] - '0';
             if (line[0] == 'p' && i < AMIGA_PROFILES)
                 snprintf(s->profile[i].name, NET_NAME, "%.15s", value);
+            if (line[0] == 'a' && i < AMIGA_PROFILES && strlen(value) == 64) {
+                int j; for(j=0;j<64&&hex_digit(value[j])>=0;j++) {}
+                if(j==64) strcpy(s->profile[i].session,value);
+            }
             if (line[0] == 'w' && i < AMIGA_PROFILES && n >= 0) s->profile[i].wins = n;      /* (its record) */
             if (line[0] == 'm' && i < AMIGA_PROFILES && n >= 0) s->profile[i].matches = n;
             if (line[0] == 'f' && i < AMIGA_PROFILES && n >= 0 && n < 10) s->profile[i].face = n;      /* its face */
@@ -200,6 +204,7 @@ int amiga_settings_save(const AmigaMenuSettings *s)
         fprintf(file, "p%d=%s\nw%d=%d\nm%d=%d\n", i, pr->name, i, pr->wins, i, pr->matches);
         fprintf(file, "f%d=%d\nr%d=%d\ni%d=%d\nt%d=%d\nc%d=%x,%x,%x,%x,%x,%x\n", i, pr->face, i, pr->rating,
                 i, pr->input > 0, i, pr->steer > 0, i, pr->keys[0], pr->keys[1], pr->keys[2], pr->keys[3], pr->keys[4], pr->keys[5]);
+        if (pr->session[0]) fprintf(file,"a%d=%s\n",i,pr->session);
         if (pr->tank >= 0) fprintf(file, "v%d=%d\n", i, pr->tank);
         if (s->profile[i].has_key) {
             fprintf(file, "k%d=", i);

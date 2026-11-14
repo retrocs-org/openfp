@@ -68,7 +68,7 @@ ONLINE_PARTS = $(patsubst src/%.c,$(OUT)/online/%.o,$(CLIENT) $(addprefix src/pl
 CLIENT_HEADERS = src/platform/amiga/surface_art.h src/platform/amiga/local/internal.h src/platform/amiga/local/pacing.h src/platform/amiga/local/profile.h src/common/operation.h src/common/mapcheck.h src/common/soundtrack.h src/common/credits.h $(ART) src/platform/amiga/vehicle_art.h src/platform/amiga/faces_art.h src/platform/amiga/classic_maps.h \
                  src/platform/amiga/menu_settings.h src/common/volume.h src/platform/amiga/sounds_8bit.h src/platform/amiga/music_mods.h
 
-ONLINE_COMMON = $(patsubst src/%.c,$(OUT)/online/%.o,$(CORE) src/common/fx_budget.c src/common/recovery.c src/common/net.c src/common/client.c src/common/rules.c src/common/sha256.c src/common/training.c src/common/mapcheck.c src/common/operation.c src/common/replay.c src/platform/amiga/menu_settings.c src/platform/amiga/public_servers.c src/platform/amiga/amiga_share.c src/platform/amiga/net_amiga.c src/platform/amiga/amiga_clock.c src/platform/amiga/amiga_sound.c $(MUSIC))
+ONLINE_COMMON = $(patsubst src/%.c,$(OUT)/online/%.o,$(CORE) src/common/cloud.c src/common/fx_budget.c src/common/recovery.c src/common/net.c src/common/client.c src/common/rules.c src/common/sha256.c src/common/training.c src/common/mapcheck.c src/common/operation.c src/common/replay.c src/platform/amiga/menu_settings.c src/platform/amiga/public_servers.c src/platform/amiga/amiga_share.c src/platform/amiga/net_amiga.c src/platform/amiga/amiga_clock.c src/platform/amiga/amiga_sound.c $(MUSIC))
 ONLINE_OBJS = $(ONLINE_COMMON) $(ONLINE_PARTS)
 all: $(OUT)/ofp68k
 

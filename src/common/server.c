@@ -147,6 +147,7 @@ static void leave_match(Server *s, SrvClient *c)
     int p = c->slot;
     memcpy(s->left_name[p], c->name, sizeof s->left_name[p]);
     memcpy(s->left_key[p], c->key_id, sizeof c->key_id);
+    memcpy(s->left_account[p], c->account_id, sizeof c->account_id);
     s->in_match[p] = -1;
     c->slot = -1;
     c->ready = c->joining = c->catching = 0;
@@ -663,20 +664,21 @@ static void name_put(Server *s, const char *name, const uint8_t id[16])
 
 static void send_cookie(Server *s, const NetAddr *to, uint32_t now)
 {
-    uint8_t b[64];
+    uint8_t b[96];
     Pack k;
     pk_init(&k, b, sizeof b);
     pk_header(&k, NM_COOKIE);
     pk_u64(&k, cookie_for(s, to, now / 30000));
     pk_bytes(&k, s->server_id, 16);
     pk_u8(&k, s->cfg.password[0] != 0);
+    pk_str(&k, s->cfg.cloud_server, 32);
     send_to(s, to, &k);                                  /* 29 bytes: smaller than the HELLO that asked */
 }
 
 static void hello(Server *s, SrvClient *c, const NetAddr *from, Pack *k, uint32_t now)
 {
     uint32_t build = uk_u32(k), window = now / 30000;
-    char name[NET_NAME];
+    char name[NET_NAME], ticket[65], account[33] = "";
     uint64_t cookie;
     uint8_t id[16], proof[32], answer[32], verifier[32], want[32];
     int i, free_slot = -1, has_verifier, same_ip = 0;
@@ -709,6 +711,8 @@ static void hello(Server *s, SrvClient *c, const NetAddr *from, Pack *k, uint32_
             }
         }
     }
+    uk_str(k, ticket, sizeof ticket);
+    if (k->bad) return;
     if (cookie != cookie_for(s, from, window) && cookie != cookie_for(s, from, window - 1)) {
         send_cookie(s, from, now);                       /* first prove you're at that address */
         return;
@@ -743,7 +747,7 @@ static void hello(Server *s, SrvClient *c, const NetAddr *from, Pack *k, uint32_
             sha256(verifier, 32, hid);                   /* a new key: its id must come from its verifier */
             key_proof(cookie, verifier, check);
             if (memcmp(hid, id, 16) || memcmp(check, proof, 32)) { send_bye(s, from, NR_KEY); return; }
-            key_put(s, id, verifier);
+            if (!s->cfg.cloud_server[0]) key_put(s, id, verifier);
         } else {
             uint8_t b[16];
             Pack o;
@@ -752,6 +756,23 @@ static void hello(Server *s, SrvClient *c, const NetAddr *from, Pack *k, uint32_
             send_to(s, from, &o);
             return;
         }
+    }
+
+    if (s->cfg.cloud_server[0]) {
+        int verified;
+        if (!ticket[0] || !s->hooks.cloud_verify) { send_bye(s, from, NR_CLOUD); return; }
+        verified = s->hooks.cloud_verify(s->hooks.ctx, ticket, s->server_id, cookie, id, account, name);
+        if (!verified) return; /* verification worker is still waiting for HTTPS */
+        if (verified < 0 || !account[0] || !name[0]) { send_bye(s, from, NR_CLOUD); return; }
+        for (i = 0; i < NET_LOBBY_MAX; i++) {
+            SrvClient *other = &s->c[i];
+            if (other != c && other->used && other->authed && !other->gone &&
+                !strcmp(other->account_id, account)) {
+                send_bye(s, from, NR_CLOUD); return; /* one active connection per cloud account */
+            }
+        }
+        if (has_verifier) key_put(s, id, verifier);
+
     }
 
     /* back after a dropout: take up the place in the match again, and catch up */
@@ -825,7 +846,10 @@ static void hello(Server *s, SrvClient *c, const NetAddr *from, Pack *k, uint32_
         c->cls = TANK_MEDIUM;
     }
     memcpy(c->key_id, id, 16);
-    {   /* a name: yours if it's free or already yours; otherwise Name2, Name3, ... */
+    memcpy(c->account_id, account, sizeof c->account_id);
+    if (account[0]) {
+        snprintf(c->name, sizeof c->name, "%s", name); /* central, unique account name */
+    } else {   /* a name: yours if it's free or already yours; otherwise Name2, Name3, ... */
         char base[NET_NAME];
         uint8_t owner[16];
         int n = 2, ok;
@@ -1366,6 +1390,7 @@ static void start_loading(Server *s, uint32_t now)
     memset(s->late, 0, sizeof s->late);
     memset(s->gone_since, 0, sizeof s->gone_since);
     memset(s->left_name, 0, sizeof s->left_name);
+    memset(s->left_account, 0, sizeof s->left_account);
     s->delay = (max_rtt / 2 + 25 + 19) / 20 + 1;
     if (s->delay < NET_DELAY_MIN) s->delay = NET_DELAY_MIN;
     if (s->delay > NET_DELAY_MAX) s->delay = NET_DELAY_MAX;
@@ -1470,6 +1495,7 @@ static void finish_match(Server *s)
         int ci = s->in_match[p];
         snprintf(r.name[p], sizeof r.name[p], "%s", ci >= 0 ? s->c[ci].name :
                  s->left_name[p][0] ? s->left_name[p] : bot_name(s->ms.seed, p));
+        snprintf(r.account_id[p], sizeof r.account_id[p], "%s", ci >= 0 ? s->c[ci].account_id : s->left_account[p]);
         r.bot[p] = ci >= 0 || s->left_name[p][0] ? 0 : s->ms.bot[p];
         r.late[p] = s->late[p];
         r.team[p] = t->team;
@@ -2160,6 +2186,7 @@ void server_reconfigure(Server *s, const ServerConfig *cfg)
     snprintf(s->cfg.name, sizeof s->cfg.name, "%s", cfg->name);
     snprintf(s->cfg.motd, sizeof s->cfg.motd, "%s", cfg->motd);
     snprintf(s->cfg.password, sizeof s->cfg.password, "%s", cfg->password);
+    snprintf(s->cfg.cloud_server, sizeof s->cfg.cloud_server, "%s", cfg->cloud_server);
     snprintf(s->cfg.admin_password, sizeof s->cfg.admin_password, "%s", cfg->admin_password);
     s->cfg.max_players = cfg->max_players < 1 ? 1 : cfg->max_players > NET_LOBBY_MAX ? NET_LOBBY_MAX : cfg->max_players;
     s->cfg.min_players = cfg->min_players < 1 ? 1 : cfg->min_players > MATCH_PLAYERS ? MATCH_PLAYERS : cfg->min_players;

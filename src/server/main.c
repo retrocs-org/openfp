@@ -29,6 +29,7 @@
 #include "common/server.h"
 #include "common/http.h"
 #include "server/config.h"
+#include "server/cloud_auth.h"
 #include "server/db.h"
 #include "common/achieve.h"
 #include "common/rules.h"
@@ -298,8 +299,10 @@ static void send_live(int over)
     static char path[] = "ofp_server-live.tmp";
     char *body = NULL, *text = NULL, num[24], resp[200];
     size_t cap = 0;
-    if (!st.public_listed || !st.listing_url[0] || !st.share_replays || !st.allow_watching) return;
+    if (st.public_listed != 1 || !st.listing_url[0] || !st.share_replays || !st.allow_watching) return;
     http_form_grow(&body, &cap, "action", "live");
+    http_form_grow(&body, &cap, "cloud_server", st.cloud_server);
+    http_form_grow(&body, &cap, "cloud_secret", st.cloud_secret);
     snprintf(num, sizeof num, "%u", (unsigned)st.port);
     http_form_grow(&body, &cap, "port", num);
     if (!over && srv.state == SRV_RUNNING) {
@@ -544,13 +547,15 @@ static void share_match(const Server *s, const MatchResult *r, const Replay *rep
     size_t cap = 0;
     int p;
     for (p = 0; p < r->players; p++) {
-        snprintf(line, sizeof line, "%s\t%s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%u\n", r->bot[p] ? "Computer" : r->name[p],
+        snprintf(line, sizeof line, "%s\t%s\t%d\t%d\t%d\t%d\t%d\t%d\t%d\t%u\t%s\n", r->bot[p] ? "Computer" : r->name[p],
                  r->team[p] == TEAM_PLAYER ? "camp" : "fortress", r->won[p], r->kills[p], r->score[p],
                  r->bot[p] ? 0 : r->rating[p], r->bot[p] ? 0 : r->rating_change[p], r->bot[p], r->cls[p],
-                 (unsigned)r->earned[p]);
+                 (unsigned)r->earned[p], r->account_id[p]);
         if (strlen(players) + strlen(line) < sizeof players) strcat(players, line);
     }
     http_form_grow(&body, &cap, "action", "match");
+    http_form_grow(&body, &cap, "cloud_server", st.cloud_server);
+    http_form_grow(&body, &cap, "cloud_secret", st.cloud_secret);
     snprintf(num, sizeof num, "%u", (unsigned)st.port); http_form_grow(&body, &cap, "port", num);
     if (st.public_host[0]) http_form_grow(&body, &cap, "host", st.public_host);
     snprintf(num, sizeof num, "%u", (unsigned)(r->ticks / TICK_RATE)); http_form_grow(&body, &cap, "seconds", num);
@@ -601,7 +606,7 @@ static void on_match(void *ctx, const Server *s, MatchResult *r, const Replay *r
         if (replay_save(rep, path) == 0) log_line(NULL, LOG_INFO, path);
         prune_files();
     }
-    if (st.public_listed && st.listing_url[0] && st.share_matches && (r->winner >= 0 || r->draw)) share_match(s, r, rep);
+    if (st.public_listed == 1 && st.listing_url[0] && st.share_matches && (r->winner >= 0 || r->draw)) share_match(s, r, rep);
     hook_match(s, r);
 }
 
@@ -629,6 +634,8 @@ static void announce(int leaving)
     server_info(&srv, &info);
     http_form(body, sizeof body, "action", leaving ? "remove" : "announce");
     snprintf(num, sizeof num, "%u", (unsigned)st.port); http_form(body, sizeof body, "port", num);
+    http_form(body, sizeof body, "cloud_server", st.cloud_server);
+    http_form(body, sizeof body, "cloud_secret", st.cloud_secret);
     http_form(body, sizeof body, "name", info.name);
     snprintf(num, sizeof num, "%u", (unsigned)info.build); http_form(body, sizeof body, "build", num);
     snprintf(num, sizeof num, "%d", info.players); http_form(body, sizeof body, "players", num);
@@ -749,6 +756,8 @@ static void nat_traversal(uint32_t now)
         polled = now ? now : 1;
         body[0] = 0;
         http_form(body, sizeof body, "action", "punches");
+        http_form(body, sizeof body, "cloud_server", st.cloud_server);
+        http_form(body, sizeof body, "cloud_secret", st.cloud_secret);
         if (st.public_host[0]) http_form(body, sizeof body, "host", st.public_host);
         snprintf(num, sizeof num, "%u", (unsigned)st.port);
         http_form(body, sizeof body, "port", num);
@@ -798,6 +807,10 @@ int main(int argc, char **argv)
     if (port_override > 0) st.port = (uint16_t)port_override;
     if (name_override) snprintf(st.name, sizeof st.name, "%s", name_override);
     if (public_override) st.public_listed = 1;
+    if (st.public_listed && (!st.cloud_server[0] || strlen(st.cloud_secret) != 64 || !http_has_tls() || strncmp(st.listing_url, "https://", 8))) {
+        fprintf(stderr, "Listed and join-code servers require cloud_server, cloud_secret and HTTPS support. See docs/ACCOUNTS.md.\n");
+        return 1;
+    }
     if (st.public_listed && !strncmp(st.listing_url, "https://", 8) && !http_has_tls())
         fprintf(stderr, "listing_url: this build has no TLS (no libcurl): it asks over http:// instead\n");
     if (check) {                                          /* what we understood, and stop */
@@ -896,6 +909,10 @@ int main(int argc, char **argv)
     hooks.desync = on_desync;
     http_ipv4_first(1);                                   /* (announced by IPv4: the address every player reaches) */
     hooks.leaders = on_leaders;
+    if (st.public_listed == 1) {
+        if (server_cloud_start(st.cloud_server, st.cloud_secret)) { fprintf(stderr, "Could not start cloud authentication.\n"); return 1; }
+        hooks.cloud_verify = server_cloud_verify;
+    }
     if (have_db) {                                        /* keys and names kept: they last across restarts */
         hooks.key_get = on_key_get; hooks.key_put = on_key_put;
         hooks.name_get = on_name_get; hooks.name_put = on_name_put;
@@ -946,6 +963,14 @@ int main(int argc, char **argv)
             if (st.log_file[0]) log_fp = fopen(st.log_file, "a");
             if (config_load(&n, cfg_file) == 0) {
                 n.port = st.port;
+                if (n.public_listed != st.public_listed || strcmp(n.cloud_server, st.cloud_server) || strcmp(n.cloud_secret, st.cloud_secret)) {
+                    log_line(NULL, LOG_ERROR, "Cloud/public settings require a server restart; reload ignored.");
+                    continue;
+                }
+                if (n.public_listed && strncmp(n.listing_url, "https://", 8)) {
+                    log_line(NULL, LOG_ERROR, "Public listing requires HTTPS; reload ignored.");
+                    continue;
+                }
                 st = n;
                 config_to_server(&st, &nc);
                 load_maps(&st, &nc);
@@ -991,6 +1016,7 @@ int main(int argc, char **argv)
     }
     log_line(NULL, LOG_INFO, "shutting down");
     if (st.public_listed && st.listing_url[0]) announce(1);
+    server_cloud_stop();
     {
         char t[200];
         snprintf(t, sizeof t, "%s has closed.", st.name);

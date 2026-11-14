@@ -24,7 +24,8 @@
   team selection, ready status, chat, host/admin roles and team leaders.
 - Server-run bot decisions, spectators, match rejoining, public server listings
   and private connections.
-- Profiles, configurable keyboard layouts, controllers and on-screen text entry.
+- Local and cloud profiles, public-server account authentication, Apple TV PIN
+  pairing, configurable keyboard layouts, controllers and on-screen text entry.
 - Configurable tank lives and match lengths up to 30 minutes; tactical team
   orders in enhanced team modes.
 

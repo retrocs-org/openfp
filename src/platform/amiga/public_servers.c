@@ -159,6 +159,80 @@ done:
     return result;
 }
 
+int amiga_cloud_request(const char *body, char *out, size_t cap)
+{
+    char request[2200];
+    char response[8192], *payload;
+    int status = -1;
+    struct Library *master = NULL, *tls = NULL;
+    SslContext *ctx = NULL;
+    Ssl *ssl = NULL;
+    struct sockaddr_in address;
+    struct TagItem tags[3];
+    struct { LONG seconds, micros; } timeout = { 12, 0 };
+    NetAddr peer;
+    int socket_fd = -1, initialized = 0, error = 0, n;
+    size_t total = 0;
+    char buffer[2048];
+
+    if(!cap||strlen(body)>1600)return -1;
+    out[0]=0;
+    snprintf(request,sizeof request,"POST /account/api/ HTTP/1.0\r\nHost: " DIRECTORY_HOST "\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: %u\r\nConnection: close\r\n\r\n%s",(unsigned)strlen(body),body);
+    if (net_init() || net_resolve(DIRECTORY_HOST, 443, &peer)) goto done;
+    master = OpenLibrary((CONST_STRPTR)"amisslmaster.library", 4);
+    if (!master || !tls_master_init(master, AMISSL_V4_API, 0)) goto done;
+    tls = tls_open(master);
+    if (!tls) goto done;
+    tags[0].ti_Tag = TAG_USER + 1;
+    tags[0].ti_Data = (ULONG)SocketBase;
+    tags[1].ti_Tag = TAG_USER + 11;
+    tags[1].ti_Data = (ULONG)&error;
+    tags[2].ti_Tag = TAG_DONE;
+    tags[2].ti_Data = 0;
+    if (tls_init(tls, tags)) goto done;
+    initialized = 1;
+    ctx = tls_context(tls, tls_method(tls));
+    if (!ctx || !tls_ca(tls, ctx, NULL, "AmiSSL:Certs")) goto done;
+    tls_verify(tls, ctx, TLS_VERIFY_PEER, NULL);
+    ssl = tls_session(tls, ctx);
+    if (!ssl || !tls_host(tls, ssl, DIRECTORY_HOST) ||
+        !tls_control(tls, ssl, TLS_SNI, 0, DIRECTORY_HOST)) goto done;
+
+    socket_fd = (int)socket(AF_INET, TCP_STREAM, 0);
+    if (socket_fd < 0) goto done;
+    tcp_option(SocketBase, socket_fd, TCP_OPTIONS, TCP_SEND_TIMEOUT, &timeout, sizeof timeout);
+    tcp_option(SocketBase, socket_fd, TCP_OPTIONS, TCP_RECEIVE_TIMEOUT, &timeout, sizeof timeout);
+    memset(&address, 0, sizeof address);
+    address.sin_len = sizeof address;
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(peer.ip);
+    address.sin_port = htons(peer.port);
+    if (tcp_connect(SocketBase, socket_fd, (struct sockaddr *)&address, sizeof address) ||
+        !tls_fd(tls, ssl, socket_fd) || tls_connect(tls, ssl) != 1 ||
+        tls_write(tls, ssl, request, (int)strlen(request)) != (int)strlen(request)) goto done;
+    while ((n = tls_read(tls, ssl, buffer, sizeof buffer)) > 0) {
+        if(total+(unsigned)n>=sizeof response)goto done;
+        memcpy(response+total,buffer,(size_t)n);total+=(unsigned)n;
+    }
+    response[total]=0;
+    payload=strstr(response,"\r\n\r\n");
+    if(n==0&&payload&&sscanf(response,"HTTP/%*s %d",&status)==1) {
+        payload+=4;
+        if(strlen(payload)>=cap) {status=-1;goto done;}
+        memcpy(out,payload,strlen(payload)+1);
+    } else status=-1;
+
+done:
+    if (ssl) tls_free_session(tls, ssl);
+    if (socket_fd >= 0) net_close(socket_fd);
+    if (ctx) tls_free_context(tls, ctx);
+    if (initialized) tls_cleanup(tls, NULL);
+    if (tls) tls_close(master);
+    if (master) CloseLibrary(master);
+    memset(request,0,sizeof request);memset(response,0,sizeof response);
+    return status;
+}
+
 static void remove_files(const AmigaPublicList *list)
 {
     remove(list->reply);

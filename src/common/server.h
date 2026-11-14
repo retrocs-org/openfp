@@ -31,6 +31,7 @@ typedef struct {                       /* how a match went, for the statistics *
     uint32_t ticks;
     char     name[MATCH_PLAYERS][NET_NAME];
     int      team[MATCH_PLAYERS], won[MATCH_PLAYERS], kills[MATCH_PLAYERS], score[MATCH_PLAYERS];
+    char     account_id[MATCH_PLAYERS][33];
     int      bot[MATCH_PLAYERS];       /* a computer player (its AI level): not in the statistics */
     int      versus, ai_level;         /* the kind of match, and the computer tank's level (together) */
     int      late[MATCH_PLAYERS];      /* joined the match on its way (not rated) */
@@ -60,6 +61,8 @@ typedef struct {                       /* all optional */
     void (*ban_add)(void *ctx, const uint8_t id[16], uint32_t ip, const char *name, const char *reason);
     int  (*ban_remove)(void *ctx, const char *name);                          /* 1 = there was one */
     int  (*leaders)(void *ctx, LeaderEntry *out, int max);      /* the top players, best first */
+    /* 1 verified, 0 pending (retry HELLO), -1 refused. No password crosses UDP. */
+    int (*cloud_verify)(void *ctx, const char *ticket, const uint8_t server_id[16], uint64_t nonce, const uint8_t key_id[16], char account[33], char name[NET_NAME]);
     void *ctx;
 } ServerHooks;
 
@@ -68,6 +71,7 @@ enum { SERVER_WEATHER_RANDOM = -1 };
 typedef struct {
     char        name[NET_SERVER_NAME];
     char        motd[NET_MOTD];
+    char        cloud_server[33];       /* nonempty: cloud login required, including spectators */
     char        password[64];          /* "" = open */
     int         max_players;           /* people in the lobby, 1 .. NET_LOBBY_MAX */
     int         min_players;           /* ready players needed for a match, 1 .. 4 */
@@ -118,6 +122,7 @@ typedef struct {
     uint32_t req_second; int req_count;   /* HISTREQ and MAPREQ this second (they're limited) */
     int      catching;                 /* catching up on the match (rejoined, or resynced): not waited for */
     int      resyncs;                  /* times out of step this match */
+    char     account_id[33];
     uint8_t  key_id[16];               /* who this is, across visits */
     uint32_t ticks_at;                 /* when the match's ticks last went to them (watchers: every 100 ms) */
     uint32_t build;                    /* their game's build (net_build_id: version, protocol): for desync reports */
@@ -160,6 +165,7 @@ struct Server {
     int        late[MATCH_PLAYERS];    /* that place was taken over on the way */
     uint32_t   gone_since[MATCH_PLAYERS];
     char       left_name[MATCH_PLAYERS][NET_NAME];  /* a tank vacated from the lobby, until a new player takes it */
+    char       left_account[MATCH_PLAYERS][33];
     uint8_t    left_key[MATCH_PLAYERS][16];        /* reserved for the same profile during this match */
     uint32_t   next_assignment;
     uint32_t   ready_since;            /* min_players were ready from this moment (start_after) */

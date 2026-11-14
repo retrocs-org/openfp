@@ -8,6 +8,7 @@ function documentation_guides(): array
         'overview' => ['Documentation', 'Guides for players, map makers and server operators.'],
         'gameplay' => ['Gameplay', 'Learn the objectives, tank combat and different game modes.'],
         'clients' => ['Clients & controls', 'Install a client, sign in, set up your controls and join a game.'],
+        'accounts' => ['Cloud accounts', 'Sign in, pair Apple TV and configure account services.'],
         'server' => ['Server setup', 'Run and configure a Linux dedicated server.'],
         'maps' => ['Map editor', 'Create a battlefield, build team bases and share your maps.'],
         'troubleshooting' => ['Troubleshooting', 'Check connections, performance and common setup problems.'],

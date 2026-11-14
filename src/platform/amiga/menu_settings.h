@@ -19,6 +19,7 @@ typedef struct {
     char name[NET_NAME];
     uint8_t key[32];
     int has_key;
+    char session[65];                 /* cloud session; passwords are never saved */
     int matches, wins;                 /* its record: local and online */
     int face;                          /* its face (0..9: faces_art.h, the desktop's ten) */
     int rating;                        /* its rating, the last server's leaderboard said (0: none yet) */

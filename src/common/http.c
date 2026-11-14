@@ -305,6 +305,8 @@ static int winhttp_request(const char *url, const char *body, char *out, size_t 
     if (con) req = WinHttpOpenRequest(con, body ? L"POST" : L"GET", path, NULL, WINHTTP_NO_REFERER,
                                       WINHTTP_DEFAULT_ACCEPT_TYPES, uc.nScheme == INTERNET_SCHEME_HTTPS ? WINHTTP_FLAG_SECURE : 0);
     if (req) {
+        DWORD redirects = WINHTTP_OPTION_REDIRECT_POLICY_NEVER;
+        if (body) WinHttpSetOption(req, WINHTTP_OPTION_REDIRECT_POLICY, &redirects, sizeof redirects);
         MultiByteToWideChar(CP_UTF8, 0, content_type, -1, headers + 14, 80);
         memcpy(headers, L"Content-Type: ", 14 * sizeof(wchar_t));
         if (WinHttpSendRequest(req, body ? headers : WINHTTP_NO_ADDITIONAL_HEADERS, body ? (DWORD)-1L : 0,

@@ -101,6 +101,7 @@ function page_end(): void
     </div>
     <div class="foot-links">
       <a href="/credits/">Credits</a>
+      <a href="/account/">Cloud account</a>
       <a href="/privacy/">Privacy</a>
       <a href="/documentation/">Documentation</a>
       <a href="/api/docs/">API</a>

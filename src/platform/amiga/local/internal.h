@@ -293,7 +293,7 @@ extern const char *const world_names[] ;
 extern AmigaMenuSettings settings;
 extern AmigaPublicList public_list;
 extern int public_tab , public_checked, public_failed;
-extern char online_status[96], edit_text[AMIGA_ADDRESS];
+extern char online_status[96], edit_text[256];
 extern int pause_row;
 int orders_available(void);
 void orders_accept(void);
