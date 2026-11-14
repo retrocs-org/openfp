@@ -40,14 +40,18 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
               'smtp': {}, 'listing': {'probe': False, 'trusted_proxies': []}}
     def write_config():
         payload = base64.b64encode(json.dumps(config).encode()).decode()
-        (fixture / 'config.inc.php').write_text("<?php return json_decode(base64_decode('" + payload + "'), true);")
+        replacement = fixture / 'config.next.php'
+        replacement.write_text("<?php return json_decode(base64_decode('" + payload + "'), true);")
+        replacement.replace(fixture / 'config.inc.php')
     write_config()
+    # Requests deliberately exercise rate limits; a previous run must not affect this run.
+    subprocess.run(['php', '-r', 'require $argv[1]."/inc/accounts.php"; ofp_db()->exec("DELETE FROM account_limits");', str(fixture)], check=True)
     # Simulated TLS exists only in this temporary test router. Production has no such switch.
     (fixture / 'router.php').write_text("<?php $_SERVER['HTTPS']=isset($_SERVER['HTTP_X_OFP_FIXTURE_INSECURE'])?'off':'on'; return false;")
     port = free_port()
     env = dict(os.environ, OFP_RELEASE_OFFLINE='1')
     log = open(fixture / 'php.log', 'w+')
-    process = subprocess.Popen(['php', '-S', f'127.0.0.1:{port}', str(fixture / 'router.php')], cwd=fixture, env=env, stdout=log, stderr=log)
+    process = subprocess.Popen(['php', '-d', 'opcache.enable_cli=0', '-S', f'127.0.0.1:{port}', str(fixture / 'router.php')], cwd=fixture, env=env, stdout=log, stderr=log)
     try:
         for _ in range(50):
             try:
@@ -105,6 +109,27 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
         api(dict(binding, action='verify', secret='0'*64, ticket=ticket), 403)
         assert api(dict(binding, action='verify', secret=secret, ticket=ticket))['id'] == account['id']
         api(dict(binding, action='verify', secret=secret, ticket=ticket), 403)
+        # Browser and game settings use the same account, protected by CSRF/session credentials.
+        assert api({'action':'profile','session':paired['session']})['preferences'] == '0'
+        api({'action':'profile_save','session':'0'*64,'favorite_tank':3,'avatar':9,'steering':1},401)
+        api({'action':'profile_save','session':paired['session'],'favorite_tank':4,'avatar':9,'steering':1},400)
+        api({'action':'profile_save','session':paired['session'],'favorite_tank':3,'avatar':9,'steering':1})
+        remote = api({'action':'profile','session':paired['session']})
+        assert remote['favorite_tank']=='3' and remote['avatar']=='9' and remote['steering']=='1'
+        _, _, settings = request('/account/',cookie=cookie)
+        assert all(label in settings for label in ['Player settings','Favorite tank','Avatar','Steering','Delete account','tank-picker','Previous tank','Rescue capacity'])
+        _, _, denied = request('/account/',{'action':'profile_save','csrf':'bad','favorite_tank':0,'avatar':0,'steering':0},cookie)
+        assert 'Reload the page' in denied
+        status, headers, _ = request('/account/',{'action':'profile_save','csrf':csrf(settings),'favorite_tank':2,'avatar':5,'steering':0},cookie)
+        assert status==303 and headers['Location']=='/account/'
+        remote=api({'action':'login','username':name,'password':password})
+        assert remote['favorite_tank']=='2' and remote['avatar']=='5' and remote['steering']=='1'
+        api({'action':'profile_save','session':paired['session'],'favorite_tank':2,'avatar':5,'steering':0,'client':'macos'})
+        api({'action':'profile_save','session':paired['session'],'favorite_tank':2,'avatar':5,'steering':1,'client':'amigaos'})
+        assert api({'action':'profile','session':paired['session'],'client':'macos'})['steering']=='0'
+        assert api({'action':'login','username':name,'password':password,'client':'amigaos'})['steering']=='1'
+        assert api({'action':'profile','session':paired['session'],'client':'windows'})['steering_saved']=='0'
+        api({'action':'profile','session':paired['session'],'client':'unknown'},400)
         api({'action': 'logout', 'session': paired['session']})
         api(dict(binding, action='ticket', session=paired['session']), 401)
         delivered = []
@@ -132,7 +157,7 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
                               'from': 'fixture@example.invalid', 'ehlo': 'localhost'}
             write_config()
             _, headers, body = request('/account/?mode=recover', cookie=cookie)
-            assert 'Send recovery link' in body
+            assert 'Send recovery link' in body, body[-4000:]
             _, _, body = request('/account/?mode=recover', {'action': 'recover', 'csrf': csrf(body), 'email': name+'@example.invalid'}, cookie)
             assert len(delivered) == 1
             assert 'a recovery link will be sent' in body
@@ -185,7 +210,8 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
             assert database('$q=$db->prepare("SELECT v.token_hash FROM account_verifications v JOIN accounts a ON a.id=v.account_id WHERE a.username=?"); $q->execute([$argv[2]]); echo $q->fetchColumn();', pending_name) == hashlib.sha256(activation.encode()).hexdigest()
             database('$q=$db->prepare("UPDATE account_verifications v JOIN accounts a ON a.id=v.account_id SET v.expires=1 WHERE a.username=?"); $q->execute([$argv[2]]);', pending_name)
             _, _, expired = request('/account/', {'action':'activate','csrf':csrf(body),'verification_token':activation}, browser)
-            assert 'activation link has expired' in expired
+            assert 'activation link has expired' in expired, re.findall(r'<p[^>]*role="alert"[^>]*>(.*?)</p>', expired)
+            assert 'Signed in as' not in expired
             _, _, body = request('/account/?mode=activation', cookie=browser)
             _, _, body = request('/account/?mode=activation', {'action':'resend','csrf':csrf(body),'email':pending_email}, browser)
             assert len(delivered) == 3  # one email per account per minute
@@ -196,20 +222,38 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
             assert replacement != activation
             _, _, bad = request('/account/', {'action':'activate','csrf':csrf(body),'verification_token':activation}, browser)
             assert 'activation link has expired' in bad
+            assert 'Signed in as' not in bad
             _, _, bad = request('/account/', {'action':'activate','csrf':'wrong','verification_token':replacement}, browser)
             assert 'Reload the page' in bad
-            _, _, body = request('/account/', {'action':'activate','csrf':csrf(body),'verification_token':replacement}, browser)
-            assert 'Email confirmed. Your account is active' in body
+            assert 'Signed in as' not in bad
+            old_csrf = csrf(body)
+            status, headers, _ = request('/account/', {'action':'activate','csrf':old_csrf,'verification_token':replacement}, browser)
+            assert status == 303 and headers['Location'] == '/account/'
+            signed_browser = session(headers)
+            assert signed_browser != browser
+            assert all(flag in headers['Set-Cookie'].lower() for flag in ['secure', 'httponly', 'samesite=lax'])
+            _, _, body = request('/account/', cookie=signed_browser)
+            assert 'Email confirmed. Your account is active and you are signed in.' in body
+            assert 'Your cloud profile' in body and f'Signed in as <strong>{pending_name}</strong>' in body
+            assert 'verification_token' not in body and 'Permanently delete account' in body
+            assert body.count('name="password"') == 1  # deletion confirmation, never a sign-in form
+            assert csrf(body) != old_csrf
+            _, _, body = request('/account/', cookie=signed_browser)
+            assert f'Signed in as <strong>{pending_name}</strong>' in body  # session persists on refresh
+            _, headers, anonymous = request('/account/', cookie=browser)
+            assert 'Signed in as' not in anonymous  # previous session cannot inherit the login
+            browser = session(headers)
             active = api({'action':'login','username':pending_name,'password':'test'})
             assert len(active['session']) == 64
-            _, _, body = request('/account/', {'action':'activate','csrf':csrf(body),'verification_token':replacement}, browser)
+            _, _, body = request('/account/', {'action':'activate','csrf':csrf(anonymous),'verification_token':replacement}, browser)
             assert 'activation link has expired' in body
+            assert 'Signed in as' not in body  # a used token cannot create another authenticated session
             # No SMTP bypass: enabling activation without mail blocks registration clearly.
             config['smtp'] = {}
             write_config()
             unavailable = api({'action':'register','username':'NoMail'+os.urandom(2).hex(),
-                               'email':'nomail@example.invalid','password':'test'}, 400)
-            assert 'email activation needs the site mail service' in unavailable['error']
+                               'email':'nomail'+os.urandom(3).hex()+'@example.invalid','password':'test'}, 400)
+            assert 'email activation needs the site mail service' in unavailable['error'], unavailable
             # Disabling activation permits immediate sign-in, including accounts still pending.
             config['accounts']['require_email_verification'] = False
             fixture_ip = '203.0.113.11'
@@ -218,9 +262,56 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
             immediate = api({'action':'register','username':'Now'+os.urandom(3).hex(),
                              'email':'now'+os.urandom(3).hex()+'@example.invalid','password':'test'})
             assert len(immediate['session']) == 64 and len(delivered) == 4
+            # Deletion is explicit, requires the current password, and revokes browser/client access.
+            delete_name = 'Gone'+os.urandom(3).hex()
+            deleted = api({'action':'register','username':delete_name,'email':delete_name+'@example.invalid','password':'test'})
+            announcement={'action':'announce','cloud_server':'fixture','cloud_secret':secret,'port':29870,
+                          'name':'HTTP test server','players':1,'max_players':2,'people':delete_name,
+                          'leaders':delete_name+'\t1200\t1\t1\t90'}
+            assert request('/api/',announcement)[0]==200
+            replay='OFPREPLAY 2\nplayer=0 bot=0 name='+delete_name+'\n'
+            report=dict(announcement,action='match',seconds=30,world='classic',goal='flag',winner='camp',
+                        players='\t'.join([delete_name,'camp','1','4','90','1200','0','0','1','0',deleted['id']]),replay=replay)
+            status, _, reply=request('/api/',report)
+            assert status==200,reply
+            match_id=int(reply.split()[-1])
+            assert request('/api/',dict(announcement,action='live',replay=replay))[0]==200
+            _, headers, body = request('/account/')
+            delete_browser=session(headers)
+            _, headers, body = request('/account/',{'action':'login','csrf':csrf(body),'username':delete_name,'password':'test'},delete_browser)
+            delete_browser=session(headers)
+            assert 'Signed in as' in body
+            _, _, denied = request('/account/',{'action':'delete_account','csrf':csrf(body),'password':'test'},delete_browser)
+            assert 'Confirm that you want' in denied
+            _, _, denied = request('/account/',{'action':'delete_account','csrf':'bad','password':'test','confirm_delete':'yes'},delete_browser)
+            assert 'Reload the page' in denied
+            _, _, denied = request('/account/',{'action':'delete_account','csrf':csrf(body),'password':'wrong','confirm_delete':'yes'},delete_browser)
+            assert 'current password' in denied
+            assert api({'action':'profile','session':deleted['session']})['username']==delete_name
+            status, headers, _ = request('/account/',{'action':'delete_account','csrf':csrf(body),'password':'test','confirm_delete':'yes'},delete_browser)
+            assert status==303 and headers['Location']=='/account/' and session(headers)!=delete_browser
+            _, _, body = request('/account/',cookie=session(headers))
+            assert 'personal details have been deleted' in body and 'Signed in as' not in body
+            api({'action':'profile','session':deleted['session']},401)
+            api({'action':'login','username':delete_name,'password':'test'},401)
+            # An older browser cookie also loses access; it cannot save or restore the account.
+            assert 'Signed in as' not in request('/account/',cookie=delete_browser)[2]
+            _, _, scrubbed=request('/api/?action=replay&id='+str(match_id))
+            assert delete_name not in scrubbed and 'DELETED_PLAYER' in scrubbed
+            # Delayed reports stay anonymous, even if someone registers the old username again.
+            api({'action':'register','username':delete_name,'email':'replacement'+os.urandom(3).hex()+'@example.invalid','password':'test'})
+            status, _, reply=request('/api/',report)
+            assert status==200,reply
+            late_id=int(reply.split()[-1])
+            _, _, scrubbed=request('/api/?action=replay&id='+str(late_id))
+            assert delete_name not in scrubbed and 'DELETED_PLAYER' in scrubbed
+            _, _, matches=request('/api/?action=matches')
+            late=next(m for m in json.loads(matches)['matches'] if m['id']==late_id)
+            assert late['players'][0]['name']=='Deleted player' and late['players'][0]['won']==1
+            assert late['players'][0]['score']==90 and late['players'][0]['deleted']==1
             smtp.shutdown()
             mail_thread.join(timeout=10)
-        print('account HTTP: visible validation, configurable passwords, activation email/expiry/resend, pending-account denial, optional activation, PIN pairing, tickets and password recovery passed')
+        print('account HTTP: visible validation, configurable passwords, activation email/expiry/resend, automatic browser sign-in, pending-account denial, optional activation, PIN pairing, tickets, password recovery, shared profile settings and confirmed account deletion passed')
     finally:
         process.terminate()
         process.wait(timeout=10)

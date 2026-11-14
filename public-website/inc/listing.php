@@ -227,6 +227,9 @@ function ofp_store_leaders(string $host, int $port, string $server_name, string 
         if (count($f) < 4 || $n >= 10) continue;
         $name = ofp_clean($f[0], 15);
         if ($name === '') continue;
+        $registered = $db->prepare('SELECT id FROM accounts WHERE username_key = ?' . ($db->inTransaction() ? ' FOR UPDATE' : ''));
+        $registered->execute([strtolower($name)]);
+        if (!$registered->fetchColumn()) continue; // Removed accounts must not reappear in server snapshots.
         $ins->execute([$host, $port, ofp_clean($server_name, 40), $name, max(0, min(4000, (int)$f[1])),
                        max(0, (int)$f[2]), max(0, (int)$f[3]), (int)($f[4] ?? 0), time()]);
         $n++;
@@ -286,8 +289,8 @@ function ofp_mode_leaders(string $goal, int $limit = 50): array
     foreach ($q->fetchAll() as $row) {
         foreach (json_decode($row['players'] ?: '[]', true) ?: [] as $p) {
             if (!empty($p['bot']) || ($p['name'] ?? '') === '') continue;
-            $n = $p['name'];
-            $by[$n] ??= ['name' => $n, 'wins' => 0, 'matches' => 0, 'kills' => 0];
+            $n = !empty($p['deleted']) ? 'deleted:'.($p['account_id']??'') : $p['name'];
+            $by[$n] ??= ['name' => $p['name'], 'wins' => 0, 'matches' => 0, 'kills' => 0];
             $by[$n]['matches']++;
             $by[$n]['wins'] += (int)!empty($p['won']);
             $by[$n]['kills'] += (int)($p['kills'] ?? 0);
@@ -371,21 +374,26 @@ function ofp_ladder_table(array $l): array
             $teams_here = [];
             foreach ($ps as $p) {
                 if (!empty($p['bot'])) continue;
-                $k = strtolower($p['name']);
+                $k = !empty($p['deleted']) ? 'deleted:' . ($p['account_id'] ?? '') : strtolower($p['name']);
+                $team = $p['ladder_teams'][$l['slug']] ?? ($member[$k] ?? null);
                 $e = &$players[$k];
-                if (!$e) $e = ['name' => $p['name'], 'played' => 0, 'won' => 0, 'lost' => 0, 'points' => 0, 'kills' => 0, 'rating' => 0, 'team' => $member[$k] ?? null];
+                if (!$e) $e = ['name' => $p['name'], 'played' => 0, 'won' => 0, 'lost' => 0, 'points' => 0, 'kills' => 0, 'rating' => 0, 'team' => $team];
                 $e['played']++;
                 $e['kills'] += (int)$p['kills'];
                 $e['rating'] += (int)$p['change'];
                 if ($p['won']) { $e['won']++; $e['points'] += 3; }
                 elseif ($row['winner'] === 'draw') { $e['drawn'] = ($e['drawn'] ?? 0) + 1; $e['points'] += 1; }   // (a draw: a point)
                 elseif ($row['winner'] !== 'none') $e['lost']++;
-                if (isset($member[$k])) $teams_here[$member[$k]][] = (int)!!$p['won'];
+                if ($team !== null) {
+                    $teams_here[$team][] = (int)!!$p['won'];
+                    $teams[$team]['seen_members'][$k] = $p['name'];
+                }
                 unset($e);
             }
             foreach ($teams_here as $team => $res) {   // a team plays when its members do; it wins if they did
                 $t = &$teams[$team];
-                if (!$t) $t = ['name' => $team, 'played' => 0, 'won' => 0, 'points' => 0, 'members' => $l['teams'][$team]];
+                if (!isset($t['played'])) $t += ['name' => $team, 'played' => 0, 'won' => 0, 'points' => 0];
+                $t['members'] = array_values($t['seen_members']);
                 $t['played']++;
                 if (max($res)) { $t['won']++; $t['points'] += 3; }
                 unset($t);
@@ -398,6 +406,7 @@ function ofp_ladder_table(array $l): array
     $order = fn($a, $b) => [$b['points'], $b['won'], $b['rating']] <=> [$a['points'], $a['won'], $a['rating']];
     usort($ranked, $order);
     usort($unranked, $order);
+    foreach ($teams as &$team) unset($team['seen_members']); unset($team);
     usort($teams, fn($a, $b) => [$b['points'], $b['won']] <=> [$a['points'], $a['won']]);
     return ['players' => array_values($ranked), 'unranked' => array_values($unranked), 'teams' => array_values($teams),
             'matches' => $matches, 'from' => $from, 'to' => $to, 'running' => time() >= $from && time() <= $to];
@@ -523,9 +532,9 @@ function ofp_forget(string $name, ?string $host = null, ?int $port = null): arra
         $q = $db->prepare("UPDATE gallery SET author = '' WHERE author = ?");
         $q->execute([$name]);
         $n['maps'] = $q->rowCount();
-        $q=$db->prepare('SELECT id FROM accounts WHERE username_key = ?');$q->execute([strtolower($name)]);$id=$q->fetchColumn();
+        $q=$db->prepare('SELECT id FROM accounts WHERE username_key = ?' . ($db->inTransaction() ? ' FOR UPDATE' : ''));$q->execute([strtolower($name)]);$id=$q->fetchColumn();
         if ($id) {
-            foreach (['account_results','account_sessions','account_tickets','account_resets','account_devices','account_verifications'] as $table)
+            foreach (['account_client_preferences','account_preferences','account_results','account_sessions','account_tickets','account_resets','account_devices','account_verifications'] as $table)
                 $db->prepare("DELETE FROM $table WHERE account_id = ?")->execute([$id]);
             $db->prepare('DELETE FROM accounts WHERE id = ?')->execute([$id]);
         }

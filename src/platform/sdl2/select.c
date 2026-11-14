@@ -237,7 +237,7 @@ void select_tank_card(SDL_Renderer *r, const Theme *t, SDL_Texture *tanks, int c
     ui_fill(r, x + 2, y + 2, 180, 14, focus ? c->value : c->frame_dark);
     if (focus) ui_text(r, x + (184 - ui_text_width(name, 1)) / 2, y + 5, 1, (Rgb){ 20, 18, 10 }, name);   /* (dark on the bar) */
     else ui_text_shadow(r, x + (184 - ui_text_width(name, 1)) / 2, y + 5, 1, UI_WHITE, name);
-    if (tanks) render_tank_icon(r, tanks, ch, TEAM_PLAYER, x + 92, y + 70, 124);
+    if (tanks) render_tank_icon(r, tanks, ch, TEAM_PLAYER, x + 92, y + 70, 92);
     else if (t->cards) SDL_RenderCopy(r, t->cards, &src, &dst);
     if (focus) {                                         /* swipe for another */
         ui_icon(r, ICON_LEFT, x + 6, y + 64, c->value);

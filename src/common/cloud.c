@@ -58,12 +58,58 @@ static int account_reply(const char *reply,CloudAccount *a,char error[96]) {
     if(!cloud_field(reply,"username",next.name,sizeof next.name)||!cloud_field(reply,"session",next.session,sizeof next.session)||
        !cloud_field(reply,"key",hex,sizeof hex)||cloud_unhex(hex,next.key,32)||cloud_unhex(next.session,hex,32)){
         snprintf(error,96,"Invalid account reply.");return -1;}
+    if(cloud_field(reply,"preferences",hex,sizeof hex) && strcmp(hex,"0")) {
+        char tank[4],avatar[4],steer[4];
+        if(strcmp(hex,"1") || !cloud_field(reply,"favorite_tank",tank,sizeof tank) ||
+           !cloud_field(reply,"avatar",avatar,sizeof avatar) || !cloud_field(reply,"steering",steer,sizeof steer) ||
+           strlen(tank)!=1 || tank[0]<'0' || tank[0]>'3' || strlen(avatar)!=1 || avatar[0]<'0' || avatar[0]>'9' ||
+           strlen(steer)!=1 || steer[0]<'0' || steer[0]>'1') {
+            snprintf(error,96,"Invalid profile preferences.");return -1;
+        }
+        next.has_preferences=1; next.preferences.tank=tank[0]-'0';
+        next.preferences.avatar=avatar[0]-'0';next.preferences.steer=steer[0]-'0';
+        next.has_steering=1; /* Older services return the single steering preference. */
+        if(cloud_field(reply,"steering_saved",hex,sizeof hex)) {
+            if(strcmp(hex,"0")&&strcmp(hex,"1")) {snprintf(error,96,"Invalid profile preferences.");return -1;}
+            next.has_steering=hex[0]=='1';
+        }
+    }
     *a=next;return 0;
+}
+void cloud_password_mask(const char *password,char *out,size_t cap) {
+    size_t n=0;const unsigned char *p=(const unsigned char *)password;if(!cap)return;
+    for(;*p&&n+1<cap;p++) {
+#ifdef __amigaos__
+        n++;
+#else
+        if((*p&0xc0)!=0x80)n++; /* UTF-8: one star per character, not per byte. */
+#endif
+    }
+    memset(out,'*',n);out[n]=0;
+}
+int cloud_profile_load(const char *session,CloudAccount *account,char error[96]) {
+    char body[128]="action=profile",reply[512];int status;
+    http_form(body,sizeof body,"session",session);http_form(body,sizeof body,"client",CLOUD_CLIENT_TYPE);status=request(body,reply,sizeof reply,error);
+    memset(body,0,sizeof body);return status==200?account_reply(reply,account,error):-1;
+}
+int cloud_profile_save(const char *session,const CloudPreferences *p,char error[96]) {
+    char body[256]="action=profile_save",reply[128],number[8];int status;
+    if(p->tank<0||p->tank>3||p->avatar<0||p->avatar>9||p->steer<0||p->steer>1) {
+        snprintf(error,96,"Invalid profile preferences.");return -1;
+    }
+    http_form(body,sizeof body,"session",session);
+    snprintf(number,sizeof number,"%d",p->tank);http_form(body,sizeof body,"favorite_tank",number);
+    snprintf(number,sizeof number,"%d",p->avatar);http_form(body,sizeof body,"avatar",number);
+    snprintf(number,sizeof number,"%d",p->steer);http_form(body,sizeof body,"steering",number);
+    http_form(body,sizeof body,"client",CLOUD_CLIENT_TYPE);
+    status=request(body,reply,sizeof reply,error);memset(body,0,sizeof body);
+    return status==200?0:-1;
 }
 int cloud_login(CloudAccount *a,const char *name,const char *email,const char *password,int create,char error[96]) {
     char body[1600]="",reply[512];int status;
     http_form(body,sizeof body,"action",create?"register":"login");http_form(body,sizeof body,"username",name);
     http_form(body,sizeof body,"email",email);http_form(body,sizeof body,"password",password);
+    http_form(body,sizeof body,"client",CLOUD_CLIENT_TYPE);
     status=request(body,reply,sizeof reply,error);memset(body,0,sizeof body);
     if(status==202) {
         if(!cloud_field(reply,"message",error,96))snprintf(error,96,"Check your email to activate your account, then sign in.");
@@ -83,7 +129,7 @@ int cloud_device_start(CloudDevice *d,char error[96]) {
 }
 int cloud_device_poll(const CloudDevice *d,CloudAccount *a,char error[96]) {
     char body[160]="action=device_poll",reply[512];int status;
-    http_form(body,sizeof body,"device",d->secret);status=request(body,reply,sizeof reply,error);
+    http_form(body,sizeof body,"device",d->secret);http_form(body,sizeof body,"client",CLOUD_CLIENT_TYPE);status=request(body,reply,sizeof reply,error);
     if(status==202)return 0;
     if(status!=200)return -1;
     return account_reply(reply,a,error)?-1:1;

@@ -60,14 +60,19 @@ curl 'https://openfp.retrocs.org/api/?action=matches&amp;limit=10'</code></pre>
   </tbody></table></div>
   <p>Errors contain <code>error</code>: 400 invalid fields or email activation still required, 401 bad credentials or expired session, 403 invalid server/ticket, 413 oversized body, 426 HTTPS required, 429 rate limit, 503 unavailable. Account bodies are limited to 4 KiB. Client sessions last 30 days by default. The password minimum is configurable (default 12 characters; maximum 72 bytes). Email activation links last 24 hours; confirmation and resending use the <a href="/account/">account page</a>. PIN approval uses the browser page <a href="/account/pin">/account/pin</a>, with account sign-in and CSRF protection. Read the <a href="/documentation/accounts/">account guide</a> for identity-key derivation and operator setup.</p>
 
+  <h3>Shared player preferences</h3>
+  <p>Successful sign-in and pairing replies include <code>preferences=1</code> with <code>favorite_tank</code> (0 Jackal, 1 Bison, 2 Mammoth, 3 Rhino), <code>avatar</code> (0–9) and <code>steering</code> (0 tank, 1 original). <code>preferences=0</code> means no cloud preferences have been saved; clients retain local defaults.</p>
+  <p>POST <code>action=profile</code> and <code>session</code> to <code>/account/api/</code> to refresh the username, identity key and preferences. POST <code>action=profile_save</code>, <code>session</code>, <code>favorite_tank</code>, <code>avatar</code> and <code>steering</code> to save them. Include <code>client</code> (<code>macos</code>, <code>windows</code>, <code>linux</code>, <code>amigaos</code> or <code>tvos</code>) in sign-in, device polling, profile and save requests to keep steering separate for each platform. A platform-aware reply includes <code>steering_saved=0</code> until that platform first saves steering; clients retain their local default in that case. Omit <code>steering</code> to update appearance without changing steering. Requests without <code>client</code> retain the legacy single-steering behavior. Success is <code>status=saved</code>; invalid values return 400, and expired or revoked sessions return 401. Device key bindings are never uploaded. Responses are not cached.</p>
+  <p>Account deletion is available through the authenticated browser account page, with current-password confirmation and CSRF protection. It revokes sessions while preserving anonymous match and team scores. Hosted replay copies omit map author/contact metadata and replace removed player identities with <code>DELETED_PLAYER</code>. Public match reports for an already deleted account ID retain anonymous results; unknown account IDs are rejected.</p>
+
   <h2 id="report">Dedicated-server reporting</h2>
   <p>All server reporting and polling requests require HTTPS and <code>cloud_server</code> plus <code>cloud_secret</code>, issued by the site operator. These are separate from player credentials. A registration owns its announced host/port. See <a href="/documentation/accounts/">server registration</a>.</p>
   <p>The game server handles these calls automatically when public listing and sharing are enabled. They are described here for integrations. Requests are bound to the caller’s public IP and UDP port. An optional <code>host</code> must resolve to that IP when hostname announcements are enabled. A listed server must announce before reporting a match or live replay.</p>
   <p>Announce about every 60 seconds. A normal announcement is checked by querying the game server over UDP; verified values replace the submitted status. The game port must be reachable. Entries expire after 180 seconds by default if announcements stop.</p>
   <pre class="code"><code>curl 'https://openfp.retrocs.org/api/' \
   --data-urlencode 'action=announce' \
-+  --data-urlencode 'cloud_server=YOUR_REGISTRATION' \
-+  --data-urlencode 'cloud_secret=YOUR_SECRET' \
+  --data-urlencode 'cloud_server=YOUR_REGISTRATION' \
+  --data-urlencode 'cloud_secret=YOUR_SECRET' \
   --data-urlencode 'port=29870' \
   --data-urlencode 'name=My OpenFP server' \
   --data-urlencode 'mode=versus' \

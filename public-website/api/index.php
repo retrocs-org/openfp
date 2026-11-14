@@ -200,7 +200,7 @@ if (!$post) {
         header('Content-Type: text/plain; charset=utf-8');
         header('Content-Disposition: attachment; filename="openfirepower-' . (int)$_GET['id'] . '-' .
                preg_replace('/[^A-Za-z0-9]+/', '-', strtolower($row['map'])) . '.ofprep"');
-        header('Cache-Control: public, max-age=86400');
+        header('Cache-Control: no-store');
         echo $data;
         exit;
     }
@@ -378,8 +378,11 @@ if ($action === 'live') {                               // a listed server's mat
     }
     $text = str_replace("\r", '', (string)($_POST['replay'] ?? ''));
     if (preg_match('/\AOFPREPLAY [12]\r?\n/', $text) !== 1 || strlen($text) > 3000000) reply(400, 'not a replay');
+    $db->beginTransaction();
+    $text = ofp_public_replay_names($db, $text);
     $db->prepare('DELETE FROM live WHERE host = ? AND port = ?')->execute([$host, $port]);
     $db->prepare('INSERT INTO live(host, port, replay, updated) VALUES(?, ?, ?, ?)')->execute([$host, $port, $text, time()]);
+    $db->commit();
     reply(200, 'ok live');
 }
 
@@ -400,20 +403,32 @@ if ($action === 'match') {                              // a listed server's fin
                       'ach' => isset($f[9]) ? (int)$f[9] & 0xFFFF : 0];                    //  achievements just earned)
     }
     if (!$players) reply(400, 'no players');
+    $db->beginTransaction();
     $seenAccounts=[];
     foreach ($players as &$player) {
         if ($player['bot']) continue;
-        $q=$db->prepare('SELECT username FROM accounts WHERE id = ?'); $q->execute([$player['account_id']]);
+        $q=$db->prepare('SELECT username FROM accounts WHERE id = ? FOR UPDATE'); $q->execute([$player['account_id']]);
         $canonical=$q->fetchColumn();
-        if (!$canonical || isset($seenAccounts[$player['account_id']])) reply(400,'unknown or duplicate cloud account in match');
+        if (isset($seenAccounts[$player['account_id']])) reply(400,'duplicate cloud account in match');
+        if (!$canonical) {
+            $q=$db->prepare('SELECT ladder_teams FROM deleted_accounts WHERE id = ?'); $q->execute([$player['account_id']]);
+            if (($teams=$q->fetchColumn())===false) reply(400,'unknown cloud account in match');
+            $canonical='Deleted player'; $player['deleted']=1;$player['ladder_teams']=json_decode($teams,true) ?: [];
+        }
         $seenAccounts[$player['account_id']]=true;
         $player['name']=$canonical;
     }
     unset($player);
     $replay = $_POST['replay'] ?? null;
     if ($replay !== null && (strlen($replay) > 3000000 || preg_match('/\AOFPREPLAY [12]\r?\n/', $replay) !== 1)) $replay = null;
+    if ($replay !== null) {
+        foreach (explode("\n", (string)($_POST['players'] ?? '')) as $index=>$line) {
+            if (!isset($players[$index]) || empty($players[$index]['deleted'])) continue;
+            $f=explode("\t",$line);$replay=ofp_replay_forget_name($replay,$f[0]);
+        }
+        $replay = ofp_public_replay_names($db, $replay);
+    }
     $before = ofp_ladder_leaders($host, $port);
-    $db->beginTransaction();
     $id = ofp_store_match([
         'host' => $host, 'port' => $port, 'server_name' => $server_name, 'seconds' => max(0, min(86400, (int)($_POST['seconds'] ?? 0))),
         'mode' => ($_POST['mode'] ?? '') === 'versus' ? 'versus' : 'together', 'world' => ofp_clean($_POST['world'] ?? '', 15),
@@ -462,6 +477,7 @@ $is_new = !$q->fetchColumn();
 // only the server knows these; the probe can't check them, so they're kept modest
 $matches = max(0, min(1000000, (int)($_POST['matches'] ?? 0)));
 $uptime = max(0, min(10 * 365 * 86400, (int)($_POST['uptime'] ?? 0)));
+$db->beginTransaction();
 ofp_store_server([
     'cloud_server' => (string)$_POST['cloud_server'],
     'host' => $host, 'port' => $port, 'name' => $info['name'], 'build' => $info['build'], 'players' => $info['players'],
@@ -483,13 +499,12 @@ ofp_store_server([
     'elapsed' => isset($_POST['elapsed']) && ctype_digit((string)$_POST['elapsed']) ? min(86400, (int)$_POST['elapsed']) : null,
     'score_camp' => isset($_POST['score_camp']) && is_numeric($_POST['score_camp']) ? (int)$_POST['score_camp'] : null,
     'score_fortress' => isset($_POST['score_fortress']) && is_numeric($_POST['score_fortress']) ? (int)$_POST['score_fortress'] : null,
-    'people' => implode(',', array_slice(array_filter(array_map(fn($n) => ofp_clean($n, 15),
-                    explode(',', (string)($_POST['people'] ?? '')))), 0, 16)),
+    'people' => ofp_public_people($db, implode(',', array_slice(array_filter(array_map(fn($n) => ofp_clean($n, 15),
+                    explode(',', (string)($_POST['people'] ?? '')))), 0, 16))),
     'hidden' => (int)!empty($_POST['hidden']),           // (a join code only: not on the list)
     'stun' => $stun !== '' ? $stun : null,
 ]);
-if ($is_new && empty($_POST['hidden'])) ofp_webhook('server_new', "A new server on the list: {$info['name']} ($host:$port). "
-                         . (ofp_settings()['site']['base_url'] ?? '') . '/server/');
+
 // its leaderboard, for the web site
 if (empty($_POST['hidden']) && isset($_POST['leaders'])) ofp_store_leaders($host, $port, $info['name'], (string)$_POST['leaders']);
 // a sample for the charts, every few minutes
@@ -498,4 +513,7 @@ $q->execute([$host, $port]);
 if ($now - (int)$q->fetchColumn() >= $cfg['sample_every'])
     $db->prepare('INSERT INTO samples(host, port, at, players, running) VALUES(?, ?, ?, ?, ?)')
        ->execute([$host, $port, $now, $info['players'], $info['running']]);
+$db->commit();
+if ($is_new && empty($_POST['hidden'])) ofp_webhook('server_new', "A new server on the list: {$info['name']} ($host:$port). "
+                         . (ofp_settings()['site']['base_url'] ?? '') . '/server/');
 reply(200, (empty($_POST['hidden']) ? "ok listed as" : "ok known as") . " $host:$port code " . ofp_join_code($host, $port));

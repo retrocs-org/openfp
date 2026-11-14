@@ -111,6 +111,13 @@ function ofp_migrations(): array
             "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS email_verified TINYINT UNSIGNED NOT NULL DEFAULT 1",
             "CREATE TABLE IF NOT EXISTS account_verifications (token_hash CHAR(64) NOT NULL PRIMARY KEY, account_id CHAR(32) NOT NULL, expires BIGINT NOT NULL, KEY verification_account (account_id), KEY verification_expires (expires)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         ]],
+        16 => ['cloud profile preferences and anonymous match history (0.1)', [
+            "CREATE TABLE IF NOT EXISTS account_preferences (account_id CHAR(32) NOT NULL PRIMARY KEY, favorite_tank TINYINT UNSIGNED NOT NULL, avatar TINYINT UNSIGNED NOT NULL, steering TINYINT UNSIGNED NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS deleted_accounts (id CHAR(32) NOT NULL PRIMARY KEY, ladder_teams TEXT NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        ]],
+        17 => ['steering preferences per client platform (0.1)', [
+            "CREATE TABLE IF NOT EXISTS account_client_preferences (account_id CHAR(32) NOT NULL, client VARCHAR(12) NOT NULL, steering TINYINT UNSIGNED NOT NULL, PRIMARY KEY(account_id, client)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        ]],
     ];
 }
 

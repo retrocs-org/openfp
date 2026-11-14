@@ -9,6 +9,12 @@ session_name('ofp_account');
 session_set_cookie_params(['secure'=>true, 'httponly'=>true, 'samesite'=>'Lax', 'path'=>'/account/']);
 ini_set('session.use_strict_mode', '1'); session_start();
 if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(32));
+function ofp_account_web_sign_in(array $account): void {
+    $_SESSION = []; session_regenerate_id(true);
+    $_SESSION['csrf'] = bin2hex(random_bytes(32));
+    $_SESSION['account'] = $account['id']; $_SESSION['username'] = $account['username'];
+    $_SESSION['password_version'] = hash('sha256', $account['password_hash']);
+}
 if (!empty($_SESSION['account'])) {
     try {
         $q = ofp_db()->prepare('SELECT username, password_hash, email_verified FROM accounts WHERE id = ?');
@@ -21,7 +27,9 @@ if (!empty($_SESSION['account'])) {
 }
 $get = fn($key) => is_string($_POST[$key] ?? null) ? $_POST[$key] : '';
 $query = fn($key) => is_string($_GET[$key] ?? null) ? $_GET[$key] : '';
-$message = ''; $error = ''; $mode = $query('mode') ?: 'login';
+$message = is_string($_SESSION['notice'] ?? null) ? $_SESSION['notice'] : '';
+unset($_SESSION['notice']);
+$error = ''; $mode = $query('mode') ?: 'login';
 if (!in_array($mode, ['login', 'register', 'recover', 'activation'], true)) $mode = 'login';
 $reset = $get('reset_token') ?: $query('reset');
 $verify = $get('verification_token') ?: $query('verify');
@@ -40,7 +48,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         $db = ofp_db();
         if (!ofp_account_rate($db, 'web:' . ofp_client_ip(), 20, 600)) throw new InvalidArgumentException('Too many attempts. Try again later.');
         ofp_account_prune($db);
-        if ($action === 'logout') {
+        if (in_array($action, ['profile_save', 'delete_account'], true)) {
+            if (empty($_SESSION['account'])) throw new InvalidArgumentException('Sign in to manage your profile.');
+            if ($action === 'profile_save') {
+                ofp_account_save_preferences($db, $_SESSION['account'], ['favorite_tank'=>$get('favorite_tank'), 'avatar'=>$get('avatar')]);
+                $_SESSION['notice'] = 'Profile saved. Your game clients receive these settings when you next sign in.';
+            } else {
+                if ($get('confirm_delete') !== 'yes') throw new InvalidArgumentException('Confirm that you want to permanently delete your account.');
+                ofp_account_delete($db, $_SESSION['account'], $get('password'));
+                $_SESSION = []; session_regenerate_id(true); $_SESSION['csrf'] = bin2hex(random_bytes(32));
+                $_SESSION['notice'] = 'Your account and personal details have been deleted. Match results remain anonymous.';
+            }
+            header('Location: /account/', true, 303); exit;
+        } elseif ($action === 'logout') {
             $_SESSION = []; session_regenerate_id(true); header('Location: /account/'); exit;
         } elseif ($action === 'recover') {
             if (!ofp_smtp_ready()) throw new InvalidArgumentException('Password recovery is disabled.');
@@ -54,9 +74,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             $_SESSION = []; session_regenerate_id(true); $_SESSION['csrf'] = bin2hex(random_bytes(32));
             $message = 'Password changed. Sign in again on your devices.'; $mode = 'login'; $reset = '';
         } elseif ($action === 'activate') {
-            if (!ofp_account_activate($db, $verify)) throw new InvalidArgumentException('This activation link has expired or was already used. Request a new activation email.');
-            $message = 'Email confirmed. Your account is active; you can now sign in on the website or in the game.';
-            $mode = 'login'; $verify = '';
+            $a = ofp_account_activate($db, $verify);
+            if (!$a) throw new InvalidArgumentException('This activation link has expired or was already used. Request a new activation email.');
+            ofp_account_web_sign_in($a);
+            $_SESSION['notice'] = 'Email confirmed. Your account is active and you are signed in.';
+            header('Location: /account/', true, 303); exit;
         } elseif ($action === 'resend') {
             if (!filter_var($get('email'), FILTER_VALIDATE_EMAIL)) throw new InvalidArgumentException('Enter a valid email address.');
             if (!ofp_smtp_ready()) throw new InvalidArgumentException('Activation email is unavailable. Contact the site administrator.');
@@ -76,8 +98,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 } else {
                     $a = ofp_account_login($db, $get('username'), $get('password'));
                     if (!$a) throw new InvalidArgumentException('Username or password is incorrect.');
-                    session_regenerate_id(true); $_SESSION['account'] = $a['id']; $_SESSION['username'] = $a['username'];
-                    $_SESSION['password_version'] = hash('sha256', $a['password_hash']);
+                    ofp_account_web_sign_in($a);
                 }
             }
             if (!$awaitingActivation) {
@@ -110,7 +131,7 @@ page_start($pinPage ? 'Connect Apple TV' : 'Cloud account', 'account');
 <?php endif; ?>
 <?php if ($mode === 'verify'): ?>
   <input type="hidden" name="verification_token" value="<?= h($verify) ?>">
-  <p>Choose Activate account to confirm your email address. You can then sign in with your username and password.</p>
+  <p>Choose Activate account to confirm your email address and sign in to the website.</p>
   <button class="btn primary" name="action" value="activate">Activate account</button>
 <?php elseif ($mode === 'activation'): ?>
   <p>Activation links are valid for 24 hours. If the email has not arrived, check your spam folder or request a new link below.</p>
@@ -146,6 +167,64 @@ page_start($pinPage ? 'Connect Apple TV' : 'Cloud account', 'account');
 </form>
 <?php if (!empty($_SESSION['account']) && !$pinPage):
 try {
+    $preferences = ofp_account_preferences(ofp_db(), $_SESSION['account']) + ['avatar'=>0, 'favorite_tank'=>1, 'steering'=>0];
+    $avatars = ['Helmet', 'Red beret', 'Field hat', 'Pilot', 'Headset', 'Green beret', 'Hood', 'Visor', 'Mohawk', 'Officer'];
+?>
+<div class="account-settings">
+<section class="account-panel"><h2>Player settings</h2>
+<p>Your avatar and favorite tank follow you across clients. A local copy lets you play offline and on private servers.</p>
+<form method="post" class="account-form">
+<input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
+<fieldset class="avatar-picker"><legend>Avatar</legend>
+<?php foreach ($avatars as $index=>$label): ?>
+<label><input type="radio" name="avatar" value="<?= $index ?>" <?= $preferences['avatar']===$index?'checked':'' ?>>
+<span class="profile-avatar" style="--avatar:<?= $index ?>" aria-hidden="true"></span><span><?= h($label) ?></span></label>
+<?php endforeach; ?></fieldset>
+<fieldset class="tank-picker" aria-describedby="tank-help">
+<legend>Favorite tank</legend>
+<div class="tank-picker-nav" hidden>
+<button type="button" data-tank-step="-1" aria-label="Previous tank">←</button>
+<span class="tank-picker-position" aria-live="polite" aria-atomic="true"></span>
+<button type="button" data-tank-step="1" aria-label="Next tank">→</button>
+</div>
+<div class="tank-options">
+<?php
+$tanks = [
+    ['Jackal','Fast, light scout',0,0.7,12,30,10],
+    ['Bison','The all-rounder',1,0.8,10,50,15],
+    ['Mammoth','Slow, heavy armour',2,1,7,80,20],
+    ['Rhino','Heavy rocket launcher',2,1,7,80,20],
+];
+$rack = ['1111111111','1232323231','1232323231','1454545451','1454545451','1454545451','1454545451','1454545451','1454545451','1454545451','1454545451','1454545451','1422222241','1111111111'];
+$rackColors = ['','#16181c','#9c9d8b','#393c37','#5d6556','#c7af65'];
+foreach ($tanks as $index=>[$name,$description,$chassis,$scale,$speed,$armour,$rescue]): ?>
+<label class="tank-choice">
+<span class="tank-choice-title"><input type="radio" name="favorite_tank" value="<?= $index ?>" <?= $preferences['favorite_tank']===$index?'checked':'' ?>> <strong><?= h($name) ?></strong></span>
+<span class="tank-visual" aria-hidden="true"><span class="tank-sprite" style="--chassis:<?= $chassis ?>;--scale:<?= $scale ?>">
+<?php if ($index===3): ?><svg class="tank-rack" viewBox="0 0 32 32"><?php foreach ($rack as $y=>$row) for ($x=0;$x<10;$x++): ?><rect x="<?= 11+$x ?>" y="<?= 5+$y ?>" width="1" height="1" fill="<?= $rackColors[(int)$row[$x]] ?>"/><?php endfor; ?></svg><?php endif; ?>
+</span></span>
+<span class="tank-description"><?= h($description) ?></span>
+<span class="tank-stat"><span>Speed <b><?= $speed ?></b></span><meter min="0" max="12" value="<?= $speed ?>" aria-label="Speed <?= $speed ?> out of 12"><?= $speed ?>/12</meter></span>
+<span class="tank-stat"><span>Armour <b><?= $armour ?></b></span><meter min="0" max="80" value="<?= $armour ?>" aria-label="Armour <?= $armour ?> out of 80"><?= $armour ?>/80</meter></span>
+<span class="tank-capacity">Rescue capacity: <?= $rescue ?> soldiers</span>
+</label>
+<?php endforeach; ?></div>
+</fieldset>
+<p id="tank-help" class="account-hint">Base tank stats; appearance and performance can vary by world. Rhino is available in enhanced worlds only.</p>
+<p class="account-hint">Steering syncs automatically for each client type. macOS, Windows, Linux, AmigaOS and Apple TV keep separate steering preferences. Change steering in the game's profile settings; key and controller bindings stay on each device.</p>
+<script src="/assets/account.js" defer></script>
+<button class="btn primary" name="action" value="profile_save">Save player settings</button>
+</form></section>
+<section class="account-panel account-delete"><h2>Delete account</h2>
+<p>Permanently removes your username, email, password, cloud preferences and sign-in credentials. Match scores and team results remain under <strong>Deleted player</strong>. Your name is removed from the site's leaderboards and hosted replays.</p>
+<p>Other people's downloaded copies and independent game server records cannot be changed by this website. Remove cached profiles from your devices separately.</p>
+<form method="post" class="account-form">
+<input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
+<label>Current password <input type="password" name="password" maxlength="72" autocomplete="current-password" required></label>
+<label class="account-confirm"><input type="checkbox" name="confirm_delete" value="yes" required> I understand this permanently deletes my account.</label>
+<button class="btn" name="action" value="delete_account">Permanently delete account</button>
+</form></section></div>
+<?php
     $q = ofp_db()->prepare('SELECT COUNT(*) AS played, COALESCE(SUM(won),0) AS won, COALESCE(SUM(kills),0) AS kills, COALESCE(SUM(score),0) AS score FROM account_results WHERE account_id = ?');
     $q->execute([$_SESSION['account']]); $stats = $q->fetch(PDO::FETCH_ASSOC);
 ?><h2>Your public matches</h2><p><?= (int)$stats['played'] ?> played · <?= (int)$stats['won'] ?> wins · <?= (int)$stats['kills'] ?> tanks destroyed · <?= (int)$stats['score'] ?> points. Match statistics follow the site's history retention.</p><?php

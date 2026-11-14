@@ -14,6 +14,7 @@
 #define MAX_PROFILES 16
 #define MAX_SIGNED   4
 
+void        signin_shutdown(void);
 void        signin_init(void);                       /* load the profiles */
 void        signin_set_theme(const void *theme);     /* (a Theme: the tank cards in the profile window) */
 void        signin_set_tanks(SDL_Texture *tanks, int classic);

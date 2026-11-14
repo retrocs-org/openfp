@@ -24,7 +24,7 @@
 typedef struct { char name[16]; uint8_t key[32]; int tank, avatar;
                  int matches, won, kills, lost, mode_won[5], cls_played[3];
                  int pad_layout, pad_fire, pad_mine, has_keys, keys[6][2];
-                 int steer; char session[65]; } Profile;                 /* (steer: STEER_TANK, STEER_DIRECT: the original's) */
+                 int steer; char session[65]; int cloud_dirty, cloud_pull; } Profile;                 /* (steer: STEER_TANK, STEER_DIRECT: the original's) */
 
 #define AVATARS 10                                   /* data/avatars.png: ten portraits, 24 x 24 (tools/make_avatars.py) */
 static const Theme *theme;                            /* (for the tank cards) */
@@ -97,8 +97,65 @@ static void save(void)
             fprintf(f, "\t%d\n", prof[i].steer);           /* (the steering, a field more) */
         }
     }
-    for (i = 0; i < nprof; i++) if (prof[i].session[0]) fprintf(f, "CLOUD\t%d\t%s\n", i, prof[i].session);
+    for (i = 0; i < nprof; i++) if (prof[i].session[0]) fprintf(f, "CLOUD\t%d\t%s\t%d\n", i, prof[i].session, prof[i].cloud_dirty);
     fclose(f);
+}
+
+static void apply_controls(void);
+
+/* The main thread owns profiles. Workers receive a copy and never touch UI state. */
+static struct {
+    SDL_Thread *thread; SDL_atomic_t done;
+    uint8_t key[32]; char session[65], error[96]; CloudPreferences preferences;
+    CloudAccount account; int result, writing; Uint32 retry_at;
+} sync_profile;
+static CloudPreferences profile_preferences(const Profile *p) {
+    CloudPreferences v = {p->tank, p->avatar, p->steer}; return v;
+}
+static void profile_changed(Profile *p) { if(p->session[0]) p->cloud_dirty=1; save(); }
+static void profile_receive(Profile *p, const CloudAccount *a) {
+    if(!p->cloud_dirty) {
+        if(a->has_preferences) {p->tank=a->preferences.tank; p->avatar=a->preferences.avatar;}
+        if(a->has_steering) p->steer=a->preferences.steer;
+        else if(p->session[0]) p->cloud_dirty=1; /* First sign-in on this platform keeps its local steering. */
+    }
+}
+static int profile_sync_worker(void *unused) {
+    (void)unused;
+    sync_profile.result=sync_profile.writing ? cloud_profile_save(sync_profile.session,&sync_profile.preferences,sync_profile.error)
+        : cloud_profile_load(sync_profile.session,&sync_profile.account,sync_profile.error);
+    SDL_AtomicSet(&sync_profile.done,1); return 0;
+}
+static void profile_sync_finish(void) {
+    if(!sync_profile.thread || !SDL_AtomicGet(&sync_profile.done)) return;
+    SDL_WaitThread(sync_profile.thread,NULL);sync_profile.thread=NULL;
+    for(int i=0;i<nprof;i++) {
+        Profile *p=&prof[i];
+        if(memcmp(p->key,sync_profile.key,32)||strcmp(p->session,sync_profile.session)) continue;
+        if(!sync_profile.result) {
+            if(sync_profile.writing) {
+                CloudPreferences v=profile_preferences(p);
+                if(v.tank==sync_profile.preferences.tank&&v.avatar==sync_profile.preferences.avatar&&v.steer==sync_profile.preferences.steer) p->cloud_dirty=0;
+            } else if(!memcmp(p->key,sync_profile.account.key,32)) profile_receive(p,&sync_profile.account);
+            save(); apply_controls();
+        } else if(!sync_profile.writing) p->cloud_pull=1;
+        break;
+    }
+    sync_profile.retry_at=SDL_GetTicks()+(sync_profile.result?60000:500);
+    memset(sync_profile.session,0,sizeof sync_profile.session);memset(&sync_profile.account,0,sizeof sync_profile.account);
+}
+static void profile_sync_frame(void) {
+    profile_sync_finish();
+    if(sync_profile.thread || (Sint32)(SDL_GetTicks()-sync_profile.retry_at)<0) return;
+    for(int i=0;i<nprof;i++) if(prof[i].session[0]&&(prof[i].cloud_dirty||prof[i].cloud_pull)) {
+        sync_profile.writing=prof[i].cloud_dirty; sync_profile.preferences=profile_preferences(&prof[i]);
+        memcpy(sync_profile.key,prof[i].key,32);strcpy(sync_profile.session,prof[i].session);
+        SDL_AtomicSet(&sync_profile.done,0);http_init();
+        sync_profile.thread=SDL_CreateThread(profile_sync_worker,"cloud-profile",NULL);
+        if(sync_profile.thread) prof[i].cloud_pull=0;
+        else sync_profile.retry_at=SDL_GetTicks()+60000;
+        break;
+    }
 }
 
 static void new_key(uint8_t key[32])
@@ -116,6 +173,7 @@ static void new_key(uint8_t key[32])
 void signin_init(void)
 {
     char path[1100], line[256];
+    signin_shutdown();
     FILE *f = fopen(path_of(path, sizeof path), "r");
     for (int i = 0; i < nprof; i++) cloud_forget(prof[i].key);
     memset(prof, 0, sizeof prof);
@@ -126,9 +184,9 @@ void signin_init(void)
         Profile *p;
         int k;
         if (!strncmp(line, "CLOUD\t", 6)) {
-            int index; char token[65]; uint8_t scratch[32];
-            if (sscanf(line, "CLOUD\t%d\t%64s", &index, token) == 2 && index >= 0 && index < nprof && !cloud_unhex(token, scratch, 32)) {
-                strcpy(prof[index].session, token); cloud_register(prof[index].key, token);
+            int index, dirty = 0; char token[65]; uint8_t scratch[32];
+            if (sscanf(line, "CLOUD\t%d\t%64s\t%d", &index, token, &dirty) >= 2 && index >= 0 && index < nprof && !cloud_unhex(token, scratch, 32)) {
+                strcpy(prof[index].session, token); prof[index].cloud_dirty = dirty != 0; cloud_register(prof[index].key, token);
             }
             continue;
         }
@@ -230,6 +288,7 @@ static void sign_out(int i)
 
 static void take(int profile)                        /* the picker's choice: in */
 {
+    if (prof[profile].session[0]) prof[profile].cloud_pull = 1;
     slot[nslot].dev = pk.dev;
     slot[nslot].profile = profile;
     slot[nslot].hold_since = 0;
@@ -254,6 +313,8 @@ static void create(void)                             /* NEW PROFILE: the typed n
     if (pk.cloud_ready) {
         memcpy(prof[nprof].key, pk.cloud_account.key, 32);
         strcpy(prof[nprof].session, pk.cloud_account.session);
+        prof[nprof].steer = pk.cloud_account.has_steering ? pk.cloud_account.preferences.steer : STEER_TANK;
+        prof[nprof].cloud_dirty = 1;
     } else new_key(prof[nprof].key);
     prof[nprof].tank = pk.tank;
     prof[nprof].avatar = pk.avatar;
@@ -307,12 +368,14 @@ static void cloud_ui_success(void) {
     cloud_register(cu.account.key,cu.account.session);
     for (i=0;i<nprof;i++) if (!memcmp(prof[i].key,cu.account.key,32)) {
         if (profile_in(i)) { snprintf(cu.error,sizeof cu.error,"This account is already signed in."); return; }
-        strcpy(prof[i].session,cu.account.session); strcpy(prof[i].name,cu.account.name); save();
+        strcpy(prof[i].session,cu.account.session); strcpy(prof[i].name,cu.account.name);
+        profile_receive(&prof[i], &cu.account); save();
         cloud_ui_close(); take(i); return;
     }
     if(nprof>=MAX_PROFILES) {snprintf(cu.error,sizeof cu.error,"No space for another profile.");return;}
     pk.cloud_account=cu.account; pk.cloud_ready=1; strcpy(pk.name,cu.account.name);
-    pk.step=1;pk.tank=1;pk.avatar=nprof%AVATARS; cloud_ui_close();
+    pk.step=1;pk.tank=cu.account.has_preferences?cu.account.preferences.tank:1;
+    pk.avatar=cu.account.has_preferences?cu.account.preferences.avatar:nprof%AVATARS; cloud_ui_close();
 }
 static int cloud_ui_event(const SDL_Event *ev,int pad) {
     if(cu.thread) {
@@ -394,9 +457,10 @@ static void cloud_ui_draw(SDL_Renderer *r,int sw,int sh) {
     snprintf(line,sizeof line,"PIN: %s",cu.thread&&cu.kind==2?"...":cu.device.pin);ui_text_bold(r,x+8,y+78,2,UI_WHITE,line);
     ui_text(r,x+8,y+108,1,UI_WHITE,"ENTER THE PIN AND SIGN IN.");
 #else
+    char mask[73]; cloud_password_mask(cu.password, mask, sizeof mask);
     for(int i=0;i<6;i++) {
         const char *label=i==0?(cu.creating?"CREATE CLOUD ACCOUNT":"SIGN IN"):i==1?"USERNAME":i==2?"EMAIL":i==3?"PASSWORD":i==4?(cu.creating?"CREATE ACCOUNT":"CONNECT"):"CANCEL";
-        const char *value=i==1?cu.username:i==2?cu.email:i==3?(cu.password[0]?"************":""):"";
+        const char *value=i==1?cu.username:i==2?cu.email:i==3?mask:"";
         int yy=y+28+i*20,on=cu.row==i;
         if(i==2&&!cu.creating) continue;
         ui_fill(r,x+6,yy-2,w-12,18,on?c->value:(Rgb){30,30,24});
@@ -468,6 +532,7 @@ void signin_frame(void)
 {
     Uint32 now = SDL_GetTicks();
     int i;
+    profile_sync_frame();
     if (pk.open && cu.open) {cloud_ui_frame();return;}
     if (pk.open && pk.keep_signed_in) {
         if (!input_device_present(pk.dev)) { pk.open = 0; return; }
@@ -527,7 +592,8 @@ void signin_frame(void)
             if (r == OW_FACE) p->avatar = (p->avatar + dir + AVATARS) % AVATARS;
             if (r == OW_STEER) p->steer = !p->steer;
             if (r == OW_TANK) p->tank = step_pick(p->tank, dir);
-            save(); apply_controls();
+            if(r==OW_FACE||r==OW_STEER||r==OW_TANK) profile_changed(p); else save();
+            apply_controls();
         }
         if (pr & IN_FIRE) {
             if (r == OW_CONTROLLER) { pk.sub = 1; pk.sel = 0; }
@@ -539,9 +605,9 @@ void signin_frame(void)
                 if (pk.dev >= DEV_PAD1) osk_open(&pk.osk, pk.name, sizeof pk.name, "YOUR NAME", 0);
                 else SDL_StartTextInput();
             }
-            else if (r == OW_FACE) { p->avatar = (p->avatar + 1) % AVATARS; save(); }
-            else if (r == OW_TANK) { p->tank = step_pick(p->tank, 1); save(); }
-            else if (r == OW_STEER) { p->steer = !p->steer; save(); }
+            else if (r == OW_FACE) { p->avatar = (p->avatar + 1) % AVATARS; profile_changed(p); }
+            else if (r == OW_TANK) { p->tank = step_pick(p->tank, 1); profile_changed(p); }
+            else if (r == OW_STEER) { p->steer = !p->steer; profile_changed(p); }
             else if (r == OW_SIGNOUT) { sign_out(me); pk.open = 0; }   /* (the rest move up: player 2 becomes player 1) */
             else if (r == OW_BACK) pk.open = 0;
         }
@@ -594,7 +660,7 @@ void        signin_set_tank(int i, int tank)
 {
     if (i < 0 || i >= nslot || tank < TANK_LIGHT || tank > TANK_RHINO || prof[slot[i].profile].tank == tank) return;
     prof[slot[i].profile].tank = tank;
-    save();
+    profile_changed(&prof[slot[i].profile]);
 }
 
 /* each signed-in profile's own controls on its device (the rest: the machine's) */
@@ -883,4 +949,17 @@ void signin_test(const char *names)
         nslot++;
     }
     signin_assign_inputs();
+}
+
+void signin_shutdown(void) {
+    if(cu.thread) { SDL_WaitThread(cu.thread,NULL);cu.thread=NULL;memset(cu.password,0,sizeof cu.password);memset(&cu.account,0,sizeof cu.account); }
+    if(sync_profile.thread) { SDL_WaitThread(sync_profile.thread,NULL); sync_profile.thread=NULL;
+        // Preserve pending edits on disk if shutdown precedes the next UI frame.
+        for(int i=0;i<nprof;i++) if(sync_profile.writing&&!sync_profile.result &&
+            !memcmp(prof[i].key,sync_profile.key,32)&&!strcmp(prof[i].session,sync_profile.session)) {
+            CloudPreferences p=profile_preferences(&prof[i]);
+            if(p.tank==sync_profile.preferences.tank&&p.avatar==sync_profile.preferences.avatar&&p.steer==sync_profile.preferences.steer) prof[i].cloud_dirty=0;
+        }
+        save();memset(&sync_profile,0,sizeof sync_profile);
+    }
 }

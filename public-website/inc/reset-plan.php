@@ -1,7 +1,7 @@
 <?php
 // SPDX-License-Identifier: MIT
 function ofp_reset_tables(): array {
-    return ['account_results','account_tickets','account_sessions','account_resets','account_devices','account_verifications','account_limits','accounts',
+    return ['account_client_preferences','account_preferences','deleted_accounts','account_results','account_tickets','account_sessions','account_resets','account_devices','account_verifications','account_limits','accounts',
         'replays','live','matches','leaders','daily_queue','daily','gallery','punch','samples','hits','servers'];
 }
 function ofp_reset_data(PDO $db): void {

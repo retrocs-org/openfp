@@ -686,6 +686,8 @@ static int commit_profile(const AmigaProfile *next, int current)
     AmigaProfile previous = settings.profile[profile_slot];
     int previous_current = settings.current;
     settings.profile[profile_slot] = *next;
+    if(next->session[0] && (memcmp(previous.key,next->key,32) || previous.face!=next->face || previous.tank!=next->tank || previous.steer!=next->steer))
+        settings.profile[profile_slot].cloud_dirty=1;
     settings.current = current;
     if (!amiga_settings_save(&settings)) {
         if (previous.session[0] && memcmp(previous.key,next->key,32)) cloud_forget(previous.key);
@@ -708,8 +710,24 @@ void profile_accept(void)
             CloudAccount account;char error[96];
             strcpy(online_status,"CONNECTING TO CLOUD ACCOUNT...");online_dirty=1;
             if(!cloud_login(&account,cloud_user,cloud_email,cloud_password,cloud_create,error)) {
+                profile_draft.cloud_dirty=0;
                 memcpy(profile_draft.key,account.key,32);profile_draft.has_key=1;
                 strcpy(profile_draft.session,account.session);strcpy(profile_draft.name,account.name);
+                {
+                    int i; for(i=0;i<AMIGA_PROFILES;i++) if(settings.profile[i].session[0]&&!memcmp(settings.profile[i].key,account.key,32)) {
+                        profile_draft.steer=settings.profile[i].steer;
+                        if(settings.profile[i].cloud_dirty) {
+                            profile_draft.face=settings.profile[i].face;profile_draft.tank=settings.profile[i].tank;
+                            profile_draft.cloud_dirty=1;
+                        }
+                        break;
+                    }
+                    if(!profile_draft.cloud_dirty && account.has_preferences) {
+                        profile_draft.face=account.preferences.avatar;profile_draft.tank=account.preferences.tank;
+                        if(account.has_steering) profile_draft.steer=account.preferences.steer;
+                    }
+                }
+                if(!account.has_steering) profile_draft.cloud_dirty=1;
                 cloud_form=0;menu_row=EDIT_FACE;strcpy(online_status,"CLOUD ACCOUNT CONNECTED");
             } else snprintf(online_status,sizeof online_status,"%s",error);
             memset(cloud_password,0,sizeof cloud_password);
@@ -778,7 +796,14 @@ void profile_accept(void)
         int creating = !settings.profile[profile_slot].name[0];
         int current = creating && join_player == 0 ? profile_slot : settings.current;
         if (!valid_profile_name(profile_draft.name, profile_slot)) return;
+        if(profile_draft.session[0] && !settings.profile[profile_slot].session[0]) profile_draft.cloud_dirty=1;
         if (!commit_profile(&profile_draft, current)) return;
+        if(settings.profile[profile_slot].session[0] && settings.profile[profile_slot].cloud_dirty) {
+            CloudPreferences p;char error[96];AmigaProfile *pr=&settings.profile[profile_slot];
+            p.tank=pr->tank<0?TANK_MEDIUM:pr->tank;p.avatar=pr->face;p.steer=pr->steer;
+            if(!cloud_profile_save(pr->session,&p,error)) {pr->cloud_dirty=0;amiga_settings_save(&settings);}
+            else strcpy(online_status,"SAVED LOCALLY; CLOUD SYNC PENDING");
+        }
         if (creating) finish_signin(profile_slot);
         else {
             apply_menu_settings();
@@ -1767,13 +1792,14 @@ static void draw_profile_edit(void)
 {
     int creating = !settings.profile[profile_slot].name[0];
     if(cloud_form) {
-        char value[36];int row;
+        char value[36],mask[73];int row;
         local_logo();console_panel(8,68,311,240,PANEL);label(17,83,GOLD,"CLOUD PROFILE");
         for(row=0;row<6;row++) {
             const char *title=row==0?"ACCOUNT":row==1?"USERNAME":row==2?"EMAIL":row==3?"PASSWORD":row==4?(cloud_create?"CREATE ACCOUNT":"SIGN IN"):"CANCEL";
-            const char *v=row==0?(cloud_create?"CREATE NEW":"SIGN IN"):row==1?cloud_user:row==2?cloud_email:row==3?(cloud_password[0]?"********":""):"";
+            const char *v=row==0?(cloud_create?"CREATE NEW":"SIGN IN"):row==1?cloud_user:row==2?cloud_email:row==3?cloud_password:"";
             if(row==2&&!cloud_create) continue;
-            if(menu_edit&&menu_row==row) v=row==3?"********":edit_text;
+            if(menu_edit&&menu_row==row) v=edit_text;
+            if(row==3) {cloud_password_mask(v,mask,sizeof mask);v=mask;}
             snprintf(value,sizeof value,"%.18s",v);
             option_row(row,15,304,103+row*20,title,value);
         }

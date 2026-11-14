@@ -14,7 +14,8 @@ if (!ofp_account_config()['enabled']) account_reply(503,['error'=>'Cloud account
 try {
     $db=ofp_db(); $action=is_string($_POST['action']??null)?$_POST['action']:''; $ip=ofp_client_ip();
     $get=fn($k)=>is_string($_POST[$k]??null)?$_POST[$k]:'';
-    if (!in_array($action,['register','login','device_start','device_poll','ticket','logout','verify'],true)) account_reply(400,['error'=>'Unknown action.']);
+    $client=ofp_account_client($get('client'));
+    if (!in_array($action,['register','login','device_start','device_poll','ticket','logout','verify','profile','profile_save'],true)) account_reply(400,['error'=>'Unknown action.']);
     if ($action==='verify') {
         if (!ofp_cloud_server($get('server'),$get('secret'))) account_reply(403,['error'=>'Unknown cloud server.']);
         $a=ofp_cloud_verify($db,$get('ticket'),$get('server'),$get('server_id'),$get('nonce'),$get('key_id'));
@@ -41,6 +42,13 @@ try {
     } else {
         $a=ofp_account_from_token($db,$get('session'));
         if (!$a) account_reply(401,['error'=>'Sign in to your cloud profile again.']);
+        if ($action==='profile') account_reply(200, ['username'=>$a['username'],'key'=>$a['player_key'],'session'=>$get('session')] + ofp_account_preferences($db, $a['id'], $client));
+        if ($action==='profile_save') {
+            $values=['favorite_tank'=>$get('favorite_tank'), 'avatar'=>$get('avatar')];
+            if (array_key_exists('steering', $_POST)) $values['steering']=$get('steering');
+            ofp_account_save_preferences($db, $a['id'], $values, $client);
+            account_reply(200, ['status'=>'saved']);
+        }
         if ($action==='logout') {
             $db->prepare('DELETE FROM account_sessions WHERE token_hash = ?')->execute([hash('sha256',$get('session'))]);
             account_reply(200,['status'=>'signed out']);
@@ -48,6 +56,6 @@ try {
         if ($action==='ticket') account_reply(200,['ticket'=>ofp_cloud_ticket($db,$a,$get('server'),$get('server_id'),$get('nonce'),$get('key_id'))]);
         account_reply(400,['error'=>'Unknown action.']);
     }
-    account_reply(200,['id'=>$a['id'],'username'=>$a['username'],'key'=>$a['player_key'],'session'=>ofp_account_session($db,$a['id'])]);
+    account_reply(200,['id'=>$a['id'],'username'=>$a['username'],'key'=>$a['player_key'],'session'=>ofp_account_session($db,$a['id'])] + ofp_account_preferences($db, $a['id'], $client));
 } catch (InvalidArgumentException $e) { account_reply(400,['error'=>$e->getMessage()]); }
 catch (Throwable $e) { error_log('OpenFP account API failed: '.$e->getMessage()); account_reply(503,['error'=>'Account service unavailable. Try again later.']); }

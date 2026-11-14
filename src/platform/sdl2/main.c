@@ -4752,6 +4752,7 @@ int main(int argc, char **argv)
                !host_srv.cfg.allow_watching ? "off" : host_srv.cfg.spectator_delay_s ? "30 s behind" : "live", host_srv.cfg.bots);
 
     save_cfg(&cfg);
+    signin_shutdown();
     input_shutdown();
     ui_shutdown();
     render_shutdown();

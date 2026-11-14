@@ -64,6 +64,31 @@ static void admission_test(void) {
     pump_account(400);CHECK(clients[0].state==NC_LOBBY&&calls==before);netc_close(&clients[0]);server_close(&public_server);
     puts("cloud admission: public rejects local, verifies asynchronously, canonical names, duplicate rejection, reconnect and private local login passed");
 }
+static void password_admission_test(void) {
+    uint8_t key[32]={19}; char token[65];
+    snprintf(token,sizeof token,"%064d",7);
+    for(int public=0;public<2;public++) {
+        ServerConfig cfg;ServerHooks hooks={0};server_default_config(&cfg);cfg.manual_start=1;
+        strcpy(cfg.password,"server-secret");if(public)strcpy(cfg.cloud_server,"test");
+        hooks.cloud_verify=verify_account;deny=0;
+        CHECK(!server_open(&public_server,0,&cfg,&hooks));
+        for(int cloud=0;cloud<2;cloud++) {
+            if(cloud)cloud_register(key,token);else cloud_forget(key);
+            for(int correct=0;correct<2;correct++) {
+                int verified=checks;snprintf(response,sizeof response,"ticket=%064d\n",8);status=200;
+                CHECK(!netc_open(&clients[0],"127.0.0.1",net_port(public_server.sock),"PasswordPilot",
+                    correct?"server-secret":"wrong",key,TANK_MEDIUM,0));
+                pump_account(1100);
+                if(public&&!cloud) CHECK(clients[0].state==NC_FAILED&&clients[0].reason==NR_CLOUD&&checks==verified);
+                else if(!correct) CHECK(clients[0].state==NC_FAILED&&clients[0].reason==NR_PASSWORD&&checks==verified);
+                else CHECK(clients[0].state==NC_LOBBY);
+                netc_close(&clients[0]);pump_account(80);
+            }
+        }
+        cloud_forget(key);server_close(&public_server);
+    }
+    puts("server passwords: private local/cloud and public cloud admission enforce the same password");
+}
 int main(void){
     CloudAccount a;CloudDevice d;char error[96],hex[65],ticket[65],out[16];uint8_t key[32]={1},id[16]={2};int before;
     cloud_hex(key,32,hex);CHECK(!cloud_unhex(hex,key,32));CHECK(cloud_unhex("g0",key,1));CHECK(cloud_unhex("0",key,1));
@@ -73,6 +98,26 @@ int main(void){
     CHECK(!cloud_login(&a,"Pilot","pilot@example.invalid","test&password=123",0,error));
     CHECK(!strcmp(a.name,"Pilot")&&!memcmp(key,a.key,32));
     CHECK(strstr(sent,"action=login")&&strstr(sent,"test%26password%3D123"));
+    CHECK(!a.has_preferences);
+    {
+        char mask[6];cloud_password_mask("",mask,sizeof mask);CHECK(!mask[0]);
+        cloud_password_mask("a",mask,sizeof mask);CHECK(!strcmp(mask,"*"));
+        cloud_password_mask("\xc3\xa9",mask,sizeof mask);CHECK(!strcmp(mask,"*"));
+        cloud_password_mask("abcdefgh",mask,sizeof mask);CHECK(!strcmp(mask,"*****"));
+        CloudPreferences preferences={3,9,1};char session[65];strcpy(session,a.session);
+        snprintf(response,sizeof response,"username=Pilot\nkey=%s\nsession=%s\npreferences=1\nfavorite_tank=3\navatar=9\nsteering=1\n",hex,session);
+        CHECK(!cloud_profile_load(session,&a,error)&&a.has_preferences&&a.preferences.tank==3&&a.preferences.avatar==9&&a.preferences.steer==1);
+        CHECK(strstr(sent,"action=profile&session=")&&strstr(sent,"client=" CLOUD_CLIENT_TYPE));
+        strcpy(response,"status=saved\n");CHECK(!cloud_profile_save(session,&preferences,error));
+        CHECK(strstr(sent,"favorite_tank=3")&&strstr(sent,"avatar=9")&&strstr(sent,"steering=1")&&strstr(sent,"client=" CLOUD_CLIENT_TYPE));
+        snprintf(response,sizeof response,"username=Pilot\nkey=%s\nsession=%s\npreferences=1\nfavorite_tank=3\navatar=9\nsteering=0\nsteering_saved=0\n",hex,session);
+        CHECK(!cloud_profile_load(session,&a,error)&&a.has_preferences&&!a.has_steering);
+        snprintf(response,sizeof response,"username=Pilot\nkey=%s\nsession=%s\npreferences=1\nfavorite_tank=3\navatar=9\nsteering=1\nsteering_saved=1\n",hex,session);
+        CHECK(!cloud_profile_load(session,&a,error)&&a.has_steering&&a.preferences.steer==1);
+        before=calls;preferences.tank=4;CHECK(cloud_profile_save(session,&preferences,error)==-1&&calls==before);
+        snprintf(response,sizeof response,"username=Pilot\nkey=%s\nsession=%s\npreferences=1\nfavorite_tank=3\navatar=10\nsteering=1\n",hex,session);
+        CHECK(cloud_profile_load(session,&a,error)==-1);
+    }
     cloud_register(a.key,a.session);
     snprintf(response,sizeof response,"ticket=%064d\n",2);
     CHECK(!cloud_join_ticket(a.key,"test",id,0x123456789abcdef0ULL,id,ticket,error));
@@ -89,6 +134,6 @@ int main(void){
     CHECK(!strcmp(d.pin,"ABCD2345"));status=202;strcpy(response,"status=pending\n");CHECK(cloud_device_poll(&d,&a,error)==0);
     status=200;snprintf(response,sizeof response,"username=Pilot\nkey=%s\nsession=%064d\n",hex,4);
     CHECK(cloud_device_poll(&d,&a,error)==1);
-    admission_test();
+    admission_test();password_admission_test();
     puts("cloud: passwords encoded, HTTPS required, tokens validated, Apple TV pairing and ticket registry passed");return 0;
 }
