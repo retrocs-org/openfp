@@ -1,6 +1,6 @@
 [Unit]
-Description=OpenFirePower dedicated server
-Documentation=https://openfp.retrocs.org/play/
+Description=OpenFP dedicated server
+Documentation=https://openfp.retrocs.org/documentation/server/
 After=network-online.target
 Wants=network-online.target
 

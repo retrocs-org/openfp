@@ -87,6 +87,20 @@ sudo systemctl enable --now ofp-server
 sudo tail -F /var/lib/ofp-server/ofp_server.log
 ```
 
+For an existing installation with the source at `/root/openfp`, refresh the
+server binary and its systemd service together:
+
+```sh
+sudo bash /root/openfp/scripts/refresh-openfp-server.sh
+```
+
+This pulls `main`, builds before stopping the service, checks the existing
+configuration, updates the binary and service, reloads systemd and starts the
+server. It keeps `/etc/ofp-server/server.cfg` and `/var/lib/ofp-server/`, saves
+the previous binary and service under `/var/backups/ofp-server/`, and restores
+them if installation or startup fails. Running matches are interrupted by the
+restart. Existing systemd drop-ins are retained.
+
 The service runs with `--quiet`, so normal game logs go to `log_file` in
 `server.cfg`. A relative path is under `/var/lib/ofp-server/`. Use
 `sudo journalctl -u ofp-server -f` for service startup errors and restarts.
