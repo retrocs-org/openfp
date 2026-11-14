@@ -29,12 +29,20 @@ $get = fn($key) => is_string($_POST[$key] ?? null) ? $_POST[$key] : '';
 $query = fn($key) => is_string($_GET[$key] ?? null) ? $_GET[$key] : '';
 $message = is_string($_SESSION['notice'] ?? null) ? $_SESSION['notice'] : '';
 unset($_SESSION['notice']);
-$error = ''; $mode = $query('mode') ?: 'login';
+// Autosave uses the same browser session and CSRF checks as ordinary forms.
+$jsonSave = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && $get('action') === 'profile_save' && $get('format') === 'json';
+function ofp_account_json(array $data, int $status = 200): never {
+    http_response_code($status); header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($data); exit;
+}
+$error = ''; $errorStatus = 400; $mode = $query('mode') ?: 'login';
 if (!in_array($mode, ['login', 'register', 'recover', 'activation'], true)) $mode = 'login';
 $reset = $get('reset_token') ?: $query('reset');
 $verify = $get('verification_token') ?: $query('verify');
 if ($reset !== '') $mode = 'reset';
 elseif ($verify !== '') $mode = 'verify';
+$emailToken = $get('email_change_token') ?: $query('confirm_email');
+if ($emailToken !== '') $mode = 'confirm_email';
 $pinPage = defined('OFP_PIN_PAGE');
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     $action = $get('action');
@@ -44,15 +52,31 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     try {
         if (!$secure) throw new InvalidArgumentException('Use HTTPS to sign in.');
         if (!ofp_account_config()['enabled']) throw new InvalidArgumentException('Cloud accounts are disabled.');
-        if (!hash_equals($_SESSION['csrf'], $get('csrf'))) throw new InvalidArgumentException('Reload the page and try again.');
+        if (!hash_equals($_SESSION['csrf'], $get('csrf'))) { $errorStatus = 403; throw new InvalidArgumentException('Reload the page and try again.'); }
         $db = ofp_db();
-        if (!ofp_account_rate($db, 'web:' . ofp_client_ip(), 20, 600)) throw new InvalidArgumentException('Too many attempts. Try again later.');
+        if ($action === 'profile_save' && empty($_SESSION['account'])) { $errorStatus = 401; throw new InvalidArgumentException('Sign in again to save your profile.'); }
+        $appearance = $action === 'profile_save';
+        if (!ofp_account_rate($db, $appearance ? 'appearance:' . $_SESSION['account'] : 'web:' . ofp_client_ip(), $appearance ? 120 : 20, $appearance ? 60 : 600)) {
+            $errorStatus = 429; throw new InvalidArgumentException('Too many attempts. Try again later.');
+        }
         ofp_account_prune($db);
-        if (in_array($action, ['profile_save', 'delete_account'], true)) {
+        if (in_array($action, ['profile_save', 'delete_account', 'change_email', 'cancel_email', 'change_password'], true)) {
             if (empty($_SESSION['account'])) throw new InvalidArgumentException('Sign in to manage your profile.');
             if ($action === 'profile_save') {
                 ofp_account_save_preferences($db, $_SESSION['account'], ['favorite_tank'=>$get('favorite_tank'), 'avatar'=>$get('avatar')]);
+                if ($jsonSave) ofp_account_json(['status'=>'saved']);
                 $_SESSION['notice'] = 'Profile saved. Your game clients receive these settings when you next sign in.';
+            } elseif ($action === 'change_email') {
+                ofp_account_email_request($db, $_SESSION['account'], $get('current_password'), $get('new_email'));
+                $_SESSION['notice'] = 'Check your new email address for a confirmation link. Your current address stays active until you confirm.';
+            } elseif ($action === 'cancel_email') {
+                $db->prepare('DELETE FROM account_email_changes WHERE account_id = ?')->execute([$_SESSION['account']]);
+                $_SESSION['notice'] = 'The pending email change has been cancelled. Your email address is unchanged.';
+            } elseif ($action === 'change_password') {
+                if ($get('new_password') !== $get('confirm_password')) throw new InvalidArgumentException('The new passwords do not match.');
+                $updated = ofp_account_change_password($db, $_SESSION['account'], $get('current_password'), $get('new_password'));
+                ofp_account_web_sign_in($updated);
+                $_SESSION['notice'] = 'Password changed. You are still signed in here; sign in again on your other devices.';
             } else {
                 if ($get('confirm_delete') !== 'yes') throw new InvalidArgumentException('Confirm that you want to permanently delete your account.');
                 ofp_account_delete($db, $_SESSION['account'], $get('password'));
@@ -62,6 +86,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             header('Location: /account/', true, 303); exit;
         } elseif ($action === 'logout') {
             $_SESSION = []; session_regenerate_id(true); header('Location: /account/'); exit;
+        } elseif ($action === 'confirm_email') {
+            if (!ofp_account_confirm_email($db, $emailToken)) throw new InvalidArgumentException('This email change link has expired or was already used. Request a new link from your account page.');
+            $_SESSION['notice'] = 'Your new email address is confirmed. Your username is unchanged.';
+            header('Location: /account/', true, 303); exit;
         } elseif ($action === 'recover') {
             if (!ofp_smtp_ready()) throw new InvalidArgumentException('Password recovery is disabled.');
             if (!filter_var($get('email'), FILTER_VALIDATE_EMAIL)) throw new InvalidArgumentException('Enter a valid email address.');
@@ -108,28 +136,36 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 } else $message = 'You are signed in.';
             }
         } else throw new InvalidArgumentException('Choose an account action and try again.');
-    } catch (InvalidArgumentException $e) { $error = $e->getMessage(); }
-      catch (Throwable $e) { error_log('OpenFP account page failed: ' . $e->getMessage()); $error = 'Account service unavailable. Try again later.'; }
+    } catch (InvalidArgumentException $e) { $error = $e->getMessage(); if ($jsonSave) ofp_account_json(['error'=>$error], $errorStatus); }
+      catch (Throwable $e) { error_log('OpenFP account page failed: ' . $e->getMessage()); $error = 'Account service unavailable. Try again later.'; if ($jsonSave) ofp_account_json(['error'=>$error], 503); }
 }
 $titles = ['login'=>'Sign in', 'register'=>'Create your account', 'recover'=>'Reset your password',
-    'reset'=>'Choose a new password', 'activation'=>'Activate your account', 'verify'=>'Confirm your email'];
+    'reset'=>'Choose a new password', 'activation'=>'Activate your account', 'verify'=>'Confirm your email', 'confirm_email'=>'Confirm email change'];
 $heading = !empty($_SESSION['account']) ? 'Your cloud profile' : ($titles[$mode] ?? 'Sign in');
 if ($pinPage && in_array($mode, ['login', 'register'], true)) $heading = 'Connect Apple TV';
 $minimum = ofp_account_config()['password_min_length'];
 page_start($pinPage ? 'Connect Apple TV' : 'Cloud account', 'account');
 ?>
-<section class="wrap section"><p class="eyebrow">OPENFP ACCOUNT</p><h1><?= h($heading) ?></h1>
-<p>Cloud profiles play on public servers and keep your identity and match statistics together. Local profiles work offline and on private servers.</p>
+<section class="wrap section account-page"><p class="eyebrow">OPENFP ACCOUNT</p><h1><?= h($heading) ?></h1>
+<?php if (empty($_SESSION['account'])): ?>
+<p class="account-intro">Play on public servers and keep your player settings and match statistics together. Local profiles work offline and on private servers.</p>
+<?php else: ?>
+<p class="account-intro">Your player settings, ready for your next game.</p>
+<?php endif; ?>
 <?php if (!$secure): ?><p class="notice">Open this page over HTTPS to use your account.</p><?php endif; ?>
 <?php if ($message): ?><p class="notice" role="status"><?= h($message) ?></p><?php endif; ?>
 <?php if ($error): ?><p class="notice account-error" role="alert"><?= h($error) ?></p><?php endif; ?>
 <?php // Server validation always shows a visible error, including when a password is too short. ?>
-<form method="post" class="account-form" novalidate>
+<form method="post" class="account-form<?= !empty($_SESSION['account']) && !$pinPage ? ' account-session' : '' ?>" novalidate>
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
 <?php if ($pinPage && in_array($mode, ['login', 'register'], true)): ?>
   <label>PIN shown on Apple TV <input name="pin" maxlength="9" autocomplete="off" value="<?= h($get('pin')) ?>" required></label>
 <?php endif; ?>
-<?php if ($mode === 'verify'): ?>
+<?php if ($mode === 'confirm_email'): ?>
+  <input type="hidden" name="email_change_token" value="<?= h($emailToken) ?>">
+  <p>Confirm the new email address you requested. Your username and player settings stay the same.</p>
+  <button class="btn primary" name="action" value="confirm_email">Confirm email change</button>
+<?php elseif ($mode === 'verify'): ?>
   <input type="hidden" name="verification_token" value="<?= h($verify) ?>">
   <p>Choose Activate account to confirm your email address and sign in to the website.</p>
   <button class="btn primary" name="action" value="activate">Activate account</button>
@@ -170,16 +206,21 @@ try {
     $preferences = ofp_account_preferences(ofp_db(), $_SESSION['account']) + ['avatar'=>0, 'favorite_tank'=>1, 'steering'=>0];
     $avatars = ['Helmet', 'Red beret', 'Field hat', 'Pilot', 'Headset', 'Green beret', 'Hood', 'Visor', 'Mohawk', 'Officer'];
 ?>
-<div class="account-settings">
-<section class="account-panel"><h2>Player settings</h2>
-<p>Your avatar and favorite tank follow you across clients. A local copy lets you play offline and on private servers.</p>
-<form method="post" class="account-form">
+<section class="account-panel account-settings" aria-labelledby="player-settings-title">
+<header class="account-panel-heading"><h2 id="player-settings-title">Player settings</h2>
+<p>Your avatar and favorite tank follow you across clients, with a local copy for offline play.</p></header>
+<form method="post" class="account-form account-profile-form">
+<input type="hidden" name="action" value="profile_save">
 <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
+<div class="account-customization">
+<div class="account-appearance">
 <fieldset class="avatar-picker"><legend>Avatar</legend>
 <?php foreach ($avatars as $index=>$label): ?>
 <label><input type="radio" name="avatar" value="<?= $index ?>" <?= $preferences['avatar']===$index?'checked':'' ?>>
 <span class="profile-avatar" style="--avatar:<?= $index ?>" aria-hidden="true"></span><span><?= h($label) ?></span></label>
 <?php endforeach; ?></fieldset>
+
+</div>
 <fieldset class="tank-picker" aria-describedby="tank-help">
 <legend>Favorite tank</legend>
 <div class="tank-picker-nav" hidden>
@@ -201,7 +242,7 @@ foreach ($tanks as $index=>[$name,$description,$chassis,$scale,$speed,$armour,$r
 <label class="tank-choice">
 <span class="tank-choice-title"><input type="radio" name="favorite_tank" value="<?= $index ?>" <?= $preferences['favorite_tank']===$index?'checked':'' ?>> <strong><?= h($name) ?></strong></span>
 <span class="tank-visual" aria-hidden="true"><span class="tank-sprite" style="--chassis:<?= $chassis ?>;--scale:<?= $scale ?>">
-<?php if ($index===3): ?><svg class="tank-rack" viewBox="0 0 32 32"><?php foreach ($rack as $y=>$row) for ($x=0;$x<10;$x++): ?><rect x="<?= 11+$x ?>" y="<?= 5+$y ?>" width="1" height="1" fill="<?= $rackColors[(int)$row[$x]] ?>"/><?php endfor; ?></svg><?php endif; ?>
+<?php if ($index===3): ?><svg class="tank-rack" viewBox="0 0 32 32" width="176" height="176" focusable="false"><?php foreach ($rack as $y=>$row) for ($x=0;$x<10;$x++): ?><rect x="<?= 11+$x ?>" y="<?= 5+$y ?>" width="1" height="1" fill="<?= $rackColors[(int)$row[$x]] ?>"/><?php endfor; ?></svg><?php endif; ?>
 </span></span>
 <span class="tank-description"><?= h($description) ?></span>
 <span class="tank-stat"><span>Speed <b><?= $speed ?></b></span><meter min="0" max="12" value="<?= $speed ?>" aria-label="Speed <?= $speed ?> out of 12"><?= $speed ?>/12</meter></span>
@@ -209,13 +250,65 @@ foreach ($tanks as $index=>[$name,$description,$chassis,$scale,$speed,$armour,$r
 <span class="tank-capacity">Rescue capacity: <?= $rescue ?> soldiers</span>
 </label>
 <?php endforeach; ?></div>
+<p id="tank-help" class="account-hint">Base stats vary by world. Rhino is available in enhanced worlds only.</p>
 </fieldset>
-<p id="tank-help" class="account-hint">Base tank stats; appearance and performance can vary by world. Rhino is available in enhanced worlds only.</p>
-<p class="account-hint">Steering syncs automatically for each client type. macOS, Windows, Linux, AmigaOS and Apple TV keep separate steering preferences. Change steering in the game's profile settings; key and controller bindings stay on each device.</p>
-<script src="/assets/account.js" defer></script>
-<button class="btn primary" name="action" value="profile_save">Save player settings</button>
+</div>
+<div class="account-save">
+<p class="account-save-status" role="status" aria-live="polite" aria-atomic="true">Changes save automatically.</p>
+<button type="button" class="btn account-save-retry" hidden>Retry saving</button>
+<noscript><p>JavaScript is off. Save your selections below.</p><button class="btn primary">Save player settings</button></noscript>
+</div>
 </form></section>
-<section class="account-panel account-delete"><h2>Delete account</h2>
+<script src="<?= h(site_asset('assets/account.js')) ?>" defer></script>
+<?php
+    $q = ofp_db()->prepare('SELECT COUNT(*) AS played, COALESCE(SUM(won),0) AS won, COALESCE(SUM(kills),0) AS kills, COALESCE(SUM(score),0) AS score FROM account_results WHERE account_id = ?');
+    $q->execute([$_SESSION['account']]); $stats = $q->fetch(PDO::FETCH_ASSOC);
+?>
+<section class="account-matches" aria-labelledby="account-matches-title"><h2 id="account-matches-title">Your public matches</h2>
+<dl class="account-stats">
+<?php foreach (['played'=>'Matches played', 'won'=>'Wins', 'kills'=>'Tanks destroyed', 'score'=>'Points'] as $key=>$label): ?>
+<div><dt><?= h($label) ?></dt><dd><?= number_format((int)$stats[$key]) ?></dd></div>
+<?php endforeach; ?>
+</dl><p class="account-hint">Match statistics follow the site's history retention.</p></section>
+<?php
+    $q = ofp_db()->prepare('SELECT email FROM accounts WHERE id = ?'); $q->execute([$_SESSION['account']]); $email = $q->fetchColumn();
+    $q = ofp_db()->prepare('SELECT new_email FROM account_email_changes WHERE account_id = ? AND expires > ?');
+    $q->execute([$_SESSION['account'], time()]); $pendingEmail = $q->fetchColumn();
+?>
+<section class="account-panel account-security" aria-labelledby="account-details-title">
+<header class="account-panel-heading"><h2 id="account-details-title">Account details</h2>
+<p>Manage your email address and password.</p></header>
+<dl class="account-identity"><div><dt>Username <span>Cannot be changed</span></dt><dd><?= h($_SESSION['username']) ?></dd></div>
+<div><dt>Email address</dt><dd><?= h($email) ?></dd></div></dl>
+<?php if ($pendingEmail): ?>
+<div class="account-pending"><p>Waiting for confirmation at <strong><?= h($pendingEmail) ?></strong>. Your current email is still active. The link expires after 24 hours.</p>
+<form method="post"><input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>"><button class="btn" name="action" value="cancel_email">Cancel email change</button></form></div>
+<?php endif; ?>
+<div class="account-credentials">
+<details <?= $get('action')==='change_email' && $error ? 'open' : '' ?>><summary>Change email <span aria-hidden="true">+</span></summary>
+<?php if (ofp_smtp_ready()): ?>
+<form method="post" class="account-form" novalidate>
+<input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
+<p>Confirm the new address by email before it replaces your current one.</p>
+<label>New email address <input type="email" name="new_email" maxlength="254" autocomplete="email" value="<?= h($get('action')==='change_email' ? $get('new_email') : '') ?>" required></label>
+<label>Current password <input type="password" name="current_password" maxlength="72" autocomplete="current-password" required></label>
+<button class="btn" name="action" value="change_email">Send confirmation email</button>
+</form>
+<?php else: ?><p class="account-hint">Email changes are unavailable until the site mail service is configured.</p><?php endif; ?>
+</details>
+<details <?= $get('action')==='change_password' && $error ? 'open' : '' ?>><summary>Change password <span aria-hidden="true">+</span></summary>
+<form method="post" class="account-form" novalidate>
+<input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
+<label>Current password <input type="password" name="current_password" maxlength="72" autocomplete="current-password" required></label>
+<label>New password <input type="password" name="new_password" minlength="<?= $minimum ?>" maxlength="72" autocomplete="new-password" aria-describedby="change-password-help" required></label>
+<p id="change-password-help" class="account-hint">At least <?= $minimum ?> characters; maximum 72 bytes.</p>
+<label>Confirm new password <input type="password" name="confirm_password" maxlength="72" autocomplete="new-password" required></label>
+<p class="account-hint">Your other devices will need to sign in again.</p>
+<button class="btn" name="action" value="change_password">Change password</button>
+</form></details>
+</div></section>
+<details class="account-delete"><summary><span>Delete account</span><span aria-hidden="true">+</span></summary>
+<div class="account-delete-content">
 <p>Permanently removes your username, email, password, cloud preferences and sign-in credentials. Match scores and team results remain under <strong>Deleted player</strong>. Your name is removed from the site's leaderboards and hosted replays.</p>
 <p>Other people's downloaded copies and independent game server records cannot be changed by this website. Remove cached profiles from your devices separately.</p>
 <form method="post" class="account-form">
@@ -223,12 +316,12 @@ foreach ($tanks as $index=>[$name,$description,$chassis,$scale,$speed,$armour,$r
 <label>Current password <input type="password" name="password" maxlength="72" autocomplete="current-password" required></label>
 <label class="account-confirm"><input type="checkbox" name="confirm_delete" value="yes" required> I understand this permanently deletes my account.</label>
 <button class="btn" name="action" value="delete_account">Permanently delete account</button>
-</form></section></div>
+</form></div></details>
 <?php
-    $q = ofp_db()->prepare('SELECT COUNT(*) AS played, COALESCE(SUM(won),0) AS won, COALESCE(SUM(kills),0) AS kills, COALESCE(SUM(score),0) AS score FROM account_results WHERE account_id = ?');
-    $q->execute([$_SESSION['account']]); $stats = $q->fetch(PDO::FETCH_ASSOC);
-?><h2>Your public matches</h2><p><?= (int)$stats['played'] ?> played · <?= (int)$stats['won'] ?> wins · <?= (int)$stats['kills'] ?> tanks destroyed · <?= (int)$stats['score'] ?> points. Match statistics follow the site's history retention.</p><?php
-} catch (Throwable $e) { } endif; ?>
+} catch (Throwable $e) {
+    error_log('OpenFP account settings: ' . $e->getMessage());
+    echo '<p class="notice account-error" role="alert">Your player settings could not be loaded. Please try again.</p>';
+} endif; ?>
 <?php if (empty($_SESSION['account'])): ?>
 <nav class="account-links" aria-label="Account options">
   <a href="<?= $pinPage ? '/account/pin' : '/account/' ?>?mode=register">Create an account</a>

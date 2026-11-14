@@ -15,17 +15,17 @@ require $fixture.'/inc/accounts.php';require $fixture.'/inc/smtp.php';require $f
 function account_check($v,string $m): void {if(!$v)throw new RuntimeException($m);}
 function account_reject(callable $f,string $m): void {try{$f();}catch(InvalidArgumentException $e){return;}throw new RuntimeException($m);}
 try {
- $db=ofp_db();account_check(ofp_schema_version($db)===17,'migration reaches 17');account_check(ofp_migrate($db)===[],'migration is idempotent');
+ $db=ofp_db();account_check(ofp_schema_version($db)===18,'migration reaches 18');account_check(ofp_migrate($db)===[],'migration is idempotent');
  // Exercise upgrading an existing version 13 schema, as well as fresh installation.
  foreach (array_filter(ofp_reset_tables(),fn($t)=>str_starts_with($t,'account_')||in_array($t,['accounts','deleted_accounts'],true)) as $t) $db->exec("DROP TABLE $t");
  $db->exec('ALTER TABLE servers DROP COLUMN cloud_server');$db->exec("UPDATE ofp_meta SET v='13' WHERE k='schema_version'");
- account_check(count(ofp_migrate($db))===4&&ofp_schema_version($db)===17,'version 13 upgrades to 17');
+ account_check(count(ofp_migrate($db))===5&&ofp_schema_version($db)===18,'version 13 upgrades to 18');
  // A pre-activation account remains active when version 14 is upgraded.
  $legacy=bin2hex(random_bytes(16));
  $db->exec('DROP TABLE account_verifications');$db->exec('ALTER TABLE accounts DROP COLUMN email_verified');
  $db->exec("UPDATE ofp_meta SET v='14' WHERE k='schema_version'");
  $db->prepare('INSERT INTO accounts VALUES(?,?,?,?,?,?,?,?)')->execute([$legacy,'Legacy','legacy','legacy@example.invalid',password_hash('legacy-fixture-password',PASSWORD_DEFAULT),bin2hex(random_bytes(32)),time(),time()]);
- account_check(count(ofp_migrate($db))===3&&ofp_schema_version($db)===17,'version 14 upgrades to 17');
+ account_check(count(ofp_migrate($db))===4&&ofp_schema_version($db)===18,'version 14 upgrades to 18');
  account_check((int)$db->query("SELECT email_verified FROM accounts WHERE username='Legacy'")->fetchColumn()===1,'existing accounts stay active');
  $id=ofp_account_register($db,'Pilot','pilot@example.invalid','fixture-password-123');
  account_reject(fn()=>ofp_account_register($db,'pilot','other@example.invalid','fixture-password-123'),'case-insensitive duplicate rejected');
@@ -77,6 +77,30 @@ try {
  ofp_account_save_preferences($db,$id,['favorite_tank'=>3,'avatar'=>9]);
  account_check(ofp_account_preferences($db,$id,'amigaos')['steering']===1 && ofp_account_preferences($db,$id,'macos')['steering']===0,'browser edits preserve all client steering');
  account_reject(fn()=>ofp_account_preferences($db,$id,'unknown'),'unknown platform rejected');
+ // Account management preserves identity while replacing credentials safely.
+ $manage=ofp_account_register($db,'Manage','manage@example.invalid','manage-fixture-password');
+ $pending=bin2hex(random_bytes(32));
+ $db->prepare('INSERT INTO account_email_changes VALUES(?,?,?,?)')->execute([$manage,hash('sha256',$pending),'new@example.invalid',time()-1]);
+ account_check(!ofp_account_confirm_email($db,$pending),'expired email confirmation rejected');
+ $db->prepare('UPDATE account_email_changes SET expires=? WHERE account_id=?')->execute([time()+60,$manage]);
+ account_check(ofp_account_confirm_email($db,$pending)&&!ofp_account_confirm_email($db,$pending),'email confirmation single use');
+ $managed=ofp_account_login($db,'Manage','manage-fixture-password');
+ account_check($managed['email']==='new@example.invalid' && (int)$managed['email_verified']===1,'new email confirmed without username change');
+ account_reject(fn()=>ofp_account_email_request($db,$manage,'manage-fixture-password','other@example.invalid'),'email change needs SMTP even with activation disabled');
+ $pending=bin2hex(random_bytes(32));
+ $db->prepare('INSERT INTO account_email_changes VALUES(?,?,?,?)')->execute([$manage,hash('sha256',$pending),'pilot@example.invalid',time()+60]);
+ account_reject(fn()=>ofp_account_confirm_email($db,$pending),'email uniqueness checked again at confirmation');
+ account_check(ofp_account_login($db,'Manage','manage-fixture-password')['email']==='new@example.invalid','conflicting email confirmation leaves account unchanged');
+ $session=ofp_account_session($db,$manage);
+ account_reject(fn()=>ofp_account_change_password($db,$manage,'wrong','replacement-fixture-password'),'current password required');
+ account_check(ofp_account_from_token($db,$session)!==null,'rejected password change keeps sessions');
+ $updated=ofp_account_change_password($db,$manage,'manage-fixture-password','replacement-fixture-password');
+ account_check($updated['username']==='Manage'&&!ofp_account_login($db,'Manage','manage-fixture-password')&&ofp_account_login($db,'Manage','replacement-fixture-password'),'password changes preserve username and accept only replacement');
+ account_check(!ofp_account_from_token($db,$session)&&!ofp_account_confirm_email($db,$pending),'password change revokes sessions and pending email links');
+ $db->prepare('INSERT INTO account_email_changes VALUES(?,?,?,?)')->execute([$manage,hash('sha256',$pending),'again@example.invalid',time()-1]);
+ ofp_account_prune($db);
+ account_check((int)$db->query('SELECT COUNT(*) FROM account_email_changes')->fetchColumn()===0,'expired pending email addresses pruned');
+ ofp_account_delete($db,$manage,'replacement-fixture-password');
  $other=ofp_account_register($db,'Wingman','wing@example.invalid','wing-fixture-password');
  $players=[['name'=>'Pilot','account_id'=>$id,'side'=>'camp','won'=>1,'kills'=>4,'score'=>90,'change'=>12,'bot'=>0],
            ['name'=>'Wingman','account_id'=>$other,'side'=>'fortress','won'=>0,'kills'=>2,'score'=>40,'change'=>-12,'bot'=>0]];
@@ -92,13 +116,14 @@ try {
  $db->prepare('INSERT INTO gallery(name,author,hash,text,size,uploaded,ip) VALUES(?,?,?,?,?,?,?)')->execute(['Fixture','Pilot',sha1($map),$map,strlen($map),time(),'203.0.113.4']);
  $token=ofp_account_session($db,$id);$active=ofp_account_login($db,'Pilot','new-fixture-password-123');
  $ticket=ofp_cloud_ticket($db,$active,'test',$sid,$nonce,$kid);$device=ofp_device_start($db);ofp_device_approve($db,$device['pin'],$id);
+ $db->prepare('INSERT INTO account_email_changes VALUES(?,?,?,?)')->execute([$id,bin2hex(random_bytes(32)),'pending@example.invalid',time()+60]);
  foreach(['account_resets','account_verifications'] as $table)$db->prepare("INSERT INTO $table VALUES(?,?,?)")->execute([bin2hex(random_bytes(32)),$id,time()+60]);
  account_reject(fn()=>ofp_account_delete($db,$id,'wrong'),'deletion requires password');
  account_check(ofp_account_from_token($db,$token)['id']===$id,'failed deletion leaves account intact');
  ofp_account_delete($db,$id,'new-fixture-password-123');
  account_check(!ofp_account_login($db,'Pilot','new-fixture-password-123')&&!ofp_account_from_token($db,$token),'deleted account cannot authenticate');
  account_check(!ofp_cloud_verify($db,$ticket,'test',$sid,$nonce,$kid)&&!ofp_device_poll($db,$device['device']),'deletion revokes tickets and pairings');
- foreach(['accounts'=>'id','account_client_preferences'=>'account_id','account_sessions'=>'account_id','account_preferences'=>'account_id','account_tickets'=>'account_id','account_devices'=>'account_id','account_resets'=>'account_id','account_verifications'=>'account_id'] as $table=>$field){
+ foreach(['accounts'=>'id','account_client_preferences'=>'account_id','account_sessions'=>'account_id','account_preferences'=>'account_id','account_tickets'=>'account_id','account_devices'=>'account_id','account_resets'=>'account_id','account_verifications'=>'account_id','account_email_changes'=>'account_id'] as $table=>$field){
      $q=$db->prepare("SELECT COUNT(*) FROM $table WHERE $field = ?");$q->execute([$id]);account_check(!(int)$q->fetchColumn(),'deletion removes '.$table);
  }
  $after=ofp_ladder_table(ofp_ladders()[0]);
@@ -124,7 +149,7 @@ try {
  account_check(ofp_public_people($db,'Pilot,Wingman')==='Wingman','deleted names cannot reappear in listing');
  account_reject(fn()=>ofp_account_delete($db,$id,'new-fixture-password-123'),'deletion cannot run twice');
  ofp_reset_data($db);foreach(ofp_reset_tables() as $t)account_check((int)$db->query("SELECT COUNT(*) FROM $t")->fetchColumn()===0,'reset empties '.$t);
- account_check(ofp_schema_version($db)===17,'reset preserves schema');
+ account_check(ofp_schema_version($db)===18,'reset preserves schema');
  // Configuration is read once per PHP request: use fresh processes for policy variants.
  $policy=<<<'PHP'
 require $argv[1].'/inc/accounts.php';
@@ -163,7 +188,7 @@ PHP;
      passthru($command,$status);account_check($status===0,'password and activation policy variant '.$min.' returned '.$status);
  }
  ofp_reset_data($db);
- echo "accounts: migrations 13/14→17, password policy, pending-account restrictions, activation, sessions, tickets, PIN pairing, recovery, preferences, account deletion, anonymous results/replays and full reset passed\n";
+ echo "accounts: migrations 13/14→18, password policy, pending-account restrictions, activation, sessions, tickets, PIN pairing, recovery, preferences, account deletion, anonymous results/replays and full reset passed\n";
 } finally {
  foreach(glob($fixture.'/inc/*') as $f)unlink($f);rmdir($fixture.'/inc');unlink($fixture.'/config.inc.php');rmdir($fixture);
 }

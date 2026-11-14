@@ -178,11 +178,83 @@ function ofp_account_reset(PDO $db, string $token, string $password): bool {
         $q = $db->prepare('SELECT account_id FROM account_resets WHERE token_hash = ? AND expires > ?' . ($db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? '' : ' FOR UPDATE'));
         $q->execute([hash('sha256', $token), time()]); $id = $q->fetchColumn();
         if (!$id) { $db->rollBack(); return false; }
-        foreach (['account_sessions', 'account_tickets', 'account_resets', 'account_devices', 'account_verifications'] as $table)
+        foreach (['account_sessions', 'account_tickets', 'account_resets', 'account_devices', 'account_verifications', 'account_email_changes'] as $table)
             $db->prepare("DELETE FROM $table WHERE account_id = ?")->execute([$id]);
         $db->prepare('UPDATE accounts SET password_hash = ?, password_changed = ? WHERE id = ?')->execute([$hash, time(), $id]);
         $db->commit(); return true;
     } catch (Throwable $e) { $db->rollBack(); throw $e; }
+}
+// Call inside a transaction so credential changes serialize with deletion and profile edits.
+function ofp_account_check_password(PDO $db, string $id, string $password): array {
+    $q = $db->prepare('SELECT * FROM accounts WHERE id = ?' . ($db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? '' : ' FOR UPDATE'));
+    $q->execute([$id]); $account = $q->fetch(PDO::FETCH_ASSOC);
+    if (!$account || !ofp_account_active($account) || strlen($password) > 72 || str_contains($password, "\0") || !password_verify($password, $account['password_hash']))
+        throw new InvalidArgumentException('Enter your current password to make this change.');
+    return $account;
+}
+function ofp_account_change_password(PDO $db, string $id, string $current, string $password): array {
+    $hash = ofp_account_password($password);
+    $db->beginTransaction();
+    try {
+        $account = ofp_account_check_password($db, $id, $current);
+        foreach (['account_sessions','account_tickets','account_resets','account_devices','account_verifications','account_email_changes'] as $table)
+            $db->prepare("DELETE FROM $table WHERE account_id = ?")->execute([$id]);
+        $db->prepare('UPDATE accounts SET password_hash = ?, password_changed = ? WHERE id = ?')->execute([$hash, time(), $id]);
+        $account['password_hash'] = $hash;
+        $db->commit(); return $account;
+    } catch (Throwable $e) { $db->rollBack(); throw $e; }
+}
+function ofp_account_email_request(PDO $db, string $id, string $password, string $email): void {
+    require_once __DIR__ . '/smtp.php';
+    $email = strtolower(trim($email));
+    if (strlen($email) > 254 || !filter_var($email, FILTER_VALIDATE_EMAIL)) throw new InvalidArgumentException('Enter a valid email address.');
+    if (!ofp_smtp_ready()) throw new InvalidArgumentException('Email changes are unavailable until the site mail service is configured.');
+    $token = bin2hex(random_bytes(32)); $tokenHash = hash('sha256', $token);
+    $db->beginTransaction();
+    try {
+        $account = ofp_account_check_password($db, $id, $password);
+        if (!strcasecmp($account['email'], $email)) throw new InvalidArgumentException('Enter a different email address.');
+        $q = $db->prepare('SELECT id FROM accounts WHERE email = ?'); $q->execute([$email]);
+        if ($q->fetchColumn()) throw new InvalidArgumentException('That email address is already registered.');
+        $db->commit();
+    } catch (Throwable $e) { $db->rollBack(); throw $e; }
+    if (!ofp_account_rate($db, 'email-change:' . $id, 1, 60)) throw new InvalidArgumentException('Wait one minute before requesting another confirmation email.');
+    $db->beginTransaction();
+    try {
+        // Recheck after the limiter transaction in case the password/account changed meanwhile.
+        ofp_account_check_password($db, $id, $password);
+        $db->prepare('DELETE FROM account_email_changes WHERE account_id = ?')->execute([$id]);
+        $db->prepare('INSERT INTO account_email_changes(account_id, token_hash, new_email, expires) VALUES(?, ?, ?, ?)')
+            ->execute([$id, $tokenHash, $email, time() + 86400]);
+        $db->commit();
+    } catch (Throwable $e) { $db->rollBack(); throw $e; }
+    $url = rtrim(ofp_settings()['site']['base_url'] ?? 'https://openfp.retrocs.org', '/') . '/account/?confirm_email=' . $token;
+    try {
+        ofp_smtp_send($email, 'Confirm your new OpenFP email address', "Confirm this new email address for your OpenFP account. Open this link within 24 hours, then choose Confirm email change:\n\n$url\n\nYour current email address stays active until you confirm. If you did not request this change, ignore this email.");
+    } catch (Throwable $e) {
+        $db->prepare('DELETE FROM account_email_changes WHERE account_id = ? AND token_hash = ?')->execute([$id, $tokenHash]);
+        error_log('OpenFP email change confirmation delivery failed.');
+        throw new InvalidArgumentException('The confirmation email could not be sent. Your email address is unchanged. Try again in a minute.');
+    }
+}
+function ofp_account_confirm_email(PDO $db, string $token): bool {
+    if (!preg_match('/\A[0-9a-f]{64}\z/D', $token)) return false;
+    $db->beginTransaction();
+    try {
+        $q = $db->prepare('SELECT a.id, c.new_email FROM accounts a JOIN account_email_changes c ON c.account_id = a.id WHERE c.token_hash = ? AND c.expires > ?' .
+            ($db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? '' : ' FOR UPDATE'));
+        $q->execute([hash('sha256', $token), time()]); $change = $q->fetch(PDO::FETCH_ASSOC);
+        if (!$change) { $db->rollBack(); return false; }
+        $db->prepare('UPDATE accounts SET email = ?, email_verified = 1 WHERE id = ?')->execute([$change['new_email'], $change['id']]);
+        foreach (['account_email_changes','account_resets','account_verifications'] as $table)
+            $db->prepare("DELETE FROM $table WHERE account_id = ?")->execute([$change['id']]);
+        $db->commit(); return true;
+    } catch (Throwable $e) {
+        $db->rollBack();
+        if ($e instanceof PDOException && in_array((string)$e->getCode(), ['23000','23505'], true))
+            throw new InvalidArgumentException('That email address is already registered. Request a new email change from your account page.');
+        throw $e;
+    }
 }
 function ofp_device_start(PDO $db): array {
     $secret = bin2hex(random_bytes(32));
@@ -211,7 +283,7 @@ function ofp_device_poll(PDO $db, string $secret): ?array {
     } catch (Throwable $e) { $db->rollBack(); throw $e; }
 }
 function ofp_account_prune(PDO $db): void {
-    foreach (['account_sessions', 'account_tickets', 'account_resets', 'account_devices', 'account_verifications'] as $t)
+    foreach (['account_sessions', 'account_tickets', 'account_resets', 'account_devices', 'account_verifications', 'account_email_changes'] as $t)
         $db->prepare("DELETE FROM $t WHERE expires <= ?")->execute([time()]);
     $db->prepare('DELETE FROM account_limits WHERE started < ?')->execute([time() - 86400]);
 }
@@ -331,7 +403,7 @@ function ofp_account_delete(PDO $db, string $id, string $password): void {
             $people = array_filter(explode(',', $server['people'] ?? ''), fn($n)=>strcasecmp(trim($n), $name));
             $db->prepare('UPDATE servers SET people = ? WHERE host = ? AND port = ?')->execute([implode(',', $people), $server['host'], $server['port']]);
         }
-        foreach (['account_client_preferences','account_preferences','account_sessions','account_tickets','account_resets','account_devices','account_verifications'] as $table)
+        foreach (['account_client_preferences','account_preferences','account_sessions','account_tickets','account_resets','account_devices','account_verifications','account_email_changes'] as $table)
             $db->prepare("DELETE FROM $table WHERE account_id = ?")->execute([$id]);
         $db->prepare('DELETE FROM account_limits WHERE bucket = ?')->execute([hash('sha256', 'username:'.strtolower($name))]);
         $db->prepare('INSERT INTO deleted_accounts(id, ladder_teams) VALUES(?, ?)')->execute([$id,json_encode($ladderTeams)]);

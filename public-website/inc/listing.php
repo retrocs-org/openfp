@@ -534,7 +534,7 @@ function ofp_forget(string $name, ?string $host = null, ?int $port = null): arra
         $n['maps'] = $q->rowCount();
         $q=$db->prepare('SELECT id FROM accounts WHERE username_key = ?' . ($db->inTransaction() ? ' FOR UPDATE' : ''));$q->execute([strtolower($name)]);$id=$q->fetchColumn();
         if ($id) {
-            foreach (['account_client_preferences','account_preferences','account_results','account_sessions','account_tickets','account_resets','account_devices','account_verifications'] as $table)
+            foreach (['account_client_preferences','account_preferences','account_results','account_sessions','account_tickets','account_resets','account_devices','account_email_changes','account_verifications'] as $table)
                 $db->prepare("DELETE FROM $table WHERE account_id = ?")->execute([$id]);
             $db->prepare('DELETE FROM accounts WHERE id = ?')->execute([$id]);
         }

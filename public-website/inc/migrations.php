@@ -118,6 +118,9 @@ function ofp_migrations(): array
         17 => ['steering preferences per client platform (0.1)', [
             "CREATE TABLE IF NOT EXISTS account_client_preferences (account_id CHAR(32) NOT NULL, client VARCHAR(12) NOT NULL, steering TINYINT UNSIGNED NOT NULL, PRIMARY KEY(account_id, client)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         ]],
+        18 => ['confirmed account email changes (0.1)', [
+            "CREATE TABLE IF NOT EXISTS account_email_changes (account_id CHAR(32) NOT NULL PRIMARY KEY, token_hash CHAR(64) NOT NULL UNIQUE, new_email VARCHAR(254) NOT NULL, expires BIGINT NOT NULL, KEY email_change_expires (expires)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        ]],
     ];
 }
 

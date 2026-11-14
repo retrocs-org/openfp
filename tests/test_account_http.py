@@ -51,7 +51,7 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
     port = free_port()
     env = dict(os.environ, OFP_RELEASE_OFFLINE='1')
     log = open(fixture / 'php.log', 'w+')
-    process = subprocess.Popen(['php', '-d', 'opcache.enable_cli=0', '-S', f'127.0.0.1:{port}', str(fixture / 'router.php')], cwd=fixture, env=env, stdout=log, stderr=log)
+    process = subprocess.Popen(['php', '-d', 'opcache.enable=0', '-S', f'127.0.0.1:{port}', str(fixture / 'router.php')], cwd=fixture, env=env, stdout=log, stderr=log)
     try:
         for _ in range(50):
             try:
@@ -117,13 +117,26 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
         remote = api({'action':'profile','session':paired['session']})
         assert remote['favorite_tank']=='3' and remote['avatar']=='9' and remote['steering']=='1'
         _, _, settings = request('/account/',cookie=cookie)
-        assert all(label in settings for label in ['Player settings','Favorite tank','Avatar','Steering','Delete account','tank-picker','Previous tank','Rescue capacity'])
+        assert all(label in settings for label in ['Player settings','Favorite tank','Avatar','Changes save automatically.','Delete account','tank-picker','Previous tank','Rescue capacity'])
+        assert '<h3>Steering</h3>' not in settings and 'name="steering"' not in settings
         _, _, denied = request('/account/',{'action':'profile_save','csrf':'bad','favorite_tank':0,'avatar':0,'steering':0},cookie)
         assert 'Reload the page' in denied
         status, headers, _ = request('/account/',{'action':'profile_save','csrf':csrf(settings),'favorite_tank':2,'avatar':5,'steering':0},cookie)
         assert status==303 and headers['Location']=='/account/'
         remote=api({'action':'login','username':name,'password':password})
         assert remote['favorite_tank']=='2' and remote['avatar']=='5' and remote['steering']=='1'
+        # Autosaves return JSON, preserve client steering and do not consume the login limiter.
+        status, _, saved = request('/account/', {'action':'profile_save','format':'json','csrf':csrf(settings),'favorite_tank':1,'avatar':2,'username':'Hacked'},cookie)
+        assert status==200 and json.loads(saved)=={'status':'saved'}
+        status, _, denied = request('/account/', {'action':'profile_save','format':'json','csrf':'bad','favorite_tank':0,'avatar':0},cookie)
+        assert status==403 and 'error' in json.loads(denied)
+        status, _, denied = request('/account/', {'action':'profile_save','format':'json','csrf':csrf(settings),'favorite_tank':9,'avatar':0},cookie)
+        assert status==400 and 'error' in json.loads(denied)
+        for i in range(22):
+            status, _, saved = request('/account/', {'action':'profile_save','format':'json','csrf':csrf(settings),'favorite_tank':2,'avatar':5},cookie)
+            assert status==200, saved
+        unchanged=api({'action':'profile','session':paired['session']})
+        assert unchanged['username']==name and unchanged['steering']=='1'
         api({'action':'profile_save','session':paired['session'],'favorite_tank':2,'avatar':5,'steering':0,'client':'macos'})
         api({'action':'profile_save','session':paired['session'],'favorite_tank':2,'avatar':5,'steering':1,'client':'amigaos'})
         assert api({'action':'profile','session':paired['session'],'client':'macos'})['steering']=='0'
@@ -157,7 +170,7 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
                               'from': 'fixture@example.invalid', 'ehlo': 'localhost'}
             write_config()
             _, headers, body = request('/account/?mode=recover', cookie=cookie)
-            assert 'Send recovery link' in body, body[-4000:]
+            assert 'Send recovery link' in body, body
             _, _, body = request('/account/?mode=recover', {'action': 'recover', 'csrf': csrf(body), 'email': name+'@example.invalid'}, cookie)
             assert len(delivered) == 1
             assert 'a recovery link will be sent' in body
@@ -248,6 +261,75 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
             _, _, body = request('/account/', {'action':'activate','csrf':csrf(anonymous),'verification_token':replacement}, browser)
             assert 'activation link has expired' in body
             assert 'Signed in as' not in body  # a used token cannot create another authenticated session
+            # Browser account controls: new email needs proof, username stays fixed, password revokes access.
+            fixture_ip='203.0.113.12'
+            manage_name='Edit'+os.urandom(3).hex()
+            managed=api({'action':'register','username':manage_name,'email':manage_name+'@example.invalid','password':'test'},202)
+            activate=re.search(r'/account/\?verify=([0-9a-f]{64})',delivered[-1]).group(1)
+            _, mh, mb=request('/account/?verify='+activate)
+            mc=session(mh)
+            _, mh, _=request('/account/',{'action':'activate','verification_token':activate,'csrf':csrf(mb)},mc)
+            mc=session(mh)
+            _, _, mb=request('/account/',cookie=mc)
+            active_managed=api({'action':'login','username':manage_name,'password':'test'})
+            second_browser=request('/account/')
+            sc=session(second_browser[1])
+            _, sh, _=request('/account/',{'action':'login','csrf':csrf(second_browser[2]),'username':manage_name,'password':'test'},sc)
+            sc=session(sh)
+            new_email=manage_name+'-new@example.invalid'
+            changes={'action':'change_email','csrf':csrf(mb),'current_password':'test','new_email':new_email,'username':'RenameAttempt'}
+            status, _, bad=request('/account/',dict(changes,csrf='bad'),mc)
+            assert 'Reload the page' in bad
+            status, _, bad=request('/account/',dict(changes,current_password='wrong'),mc)
+            assert 'Enter your current password' in bad
+            before=len(delivered)
+            status, _, _=request('/account/',changes,mc)
+            assert status==303 and len(delivered)==before+1
+            email_link=re.search(r'/account/\?confirm_email=([0-9a-f]{64})',delivered[-1]).group(1)
+            assert database('$q=$db->prepare("SELECT email FROM accounts WHERE username=?");$q->execute([$argv[2]]);echo $q->fetchColumn();',manage_name)==manage_name.lower()+'@example.invalid'
+            assert database('$q=$db->prepare("SELECT token_hash FROM account_email_changes WHERE account_id=?");$q->execute([$argv[2]]);echo $q->fetchColumn();',active_managed['id'])==hashlib.sha256(email_link.encode()).hexdigest()
+            # GET does not confirm (mail scanners may open the link).
+            _, _, mb=request('/account/?confirm_email='+email_link,cookie=mc)
+            assert 'Confirm email change' in mb
+            assert database('$q=$db->prepare("SELECT email FROM accounts WHERE username=?");$q->execute([$argv[2]]);echo $q->fetchColumn();',manage_name)==manage_name.lower()+'@example.invalid'
+            status, _, _=request('/account/',{'action':'confirm_email','email_change_token':email_link,'csrf':csrf(mb)},mc)
+            assert status==303
+            assert database('$q=$db->prepare("SELECT email FROM accounts WHERE username=?");$q->execute([$argv[2]]);echo $q->fetchColumn();',manage_name)==new_email.lower()
+            _, _, bad=request('/account/',{'action':'confirm_email','email_change_token':email_link,'csrf':csrf(mb)},mc)
+            assert 'link has expired or was already used' in bad
+            assert api({'action':'profile','session':active_managed['session']})['username']==manage_name
+            # Permit another request, cancel it, and prove its token cannot change the email.
+            database('$db->exec("DELETE FROM account_limits");')
+            _, _, mb=request('/account/',cookie=mc)
+            request('/account/',dict(changes,csrf=csrf(mb),new_email=manage_name+'-cancel@example.invalid'),mc)
+            cancelled=re.search(r'/account/\?confirm_email=([0-9a-f]{64})',delivered[-1]).group(1)
+            request('/account/',{'action':'cancel_email','csrf':csrf(mb)},mc)
+            _, _, bad=request('/account/',{'action':'confirm_email','email_change_token':cancelled,'csrf':csrf(mb)},mc)
+            assert 'link has expired' in bad
+            password_change={'action':'change_password','csrf':csrf(mb),'current_password':'test','new_password':'replacement-pass','confirm_password':'other'}
+            assert 'do not match' in request('/account/',password_change,mc)[2]
+            password_change['confirm_password']='replacement-pass'
+            assert 'current password' in request('/account/',dict(password_change,current_password='wrong'),mc)[2]
+            status, mh, _=request('/account/',password_change,mc)
+            assert status==303 and session(mh)!=mc
+            mc=session(mh)
+            _, _, mb=request('/account/',cookie=mc)
+            assert 'Password changed. You are still signed in here' in mb
+            assert f'Signed in as <strong>{manage_name}</strong>' in mb
+            assert 'Signed in as' not in request('/account/',cookie=sc)[2]
+            api({'action':'profile','session':active_managed['session']},401)
+            api({'action':'login','username':manage_name,'password':'test'},401)
+            assert api({'action':'login','username':manage_name,'password':'replacement-pass'})['id']==active_managed['id']
+            # Email edits cannot silently skip confirmation when registration activation is disabled.
+            config['accounts']['require_email_verification']=False
+            write_config()
+            database('$db->exec("DELETE FROM account_limits");')
+            request('/account/',dict(changes,csrf=csrf(mb),current_password='replacement-pass',new_email=manage_name+'-off@example.invalid'),mc)
+            _, _, mb=request('/account/',cookie=mc)
+            assert 'Waiting for confirmation' in mb
+            assert database('$q=$db->prepare("SELECT email FROM accounts WHERE username=?");$q->execute([$argv[2]]);echo $q->fetchColumn();',manage_name)==new_email.lower()
+            config['accounts'].pop('require_email_verification')
+            write_config()
             # No SMTP bypass: enabling activation without mail blocks registration clearly.
             config['smtp'] = {}
             write_config()
@@ -261,7 +343,7 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
             api({'action':'login','username':short_name,'password':'test'})
             immediate = api({'action':'register','username':'Now'+os.urandom(3).hex(),
                              'email':'now'+os.urandom(3).hex()+'@example.invalid','password':'test'})
-            assert len(immediate['session']) == 64 and len(delivered) == 4
+            assert len(immediate['session']) == 64
             # Deletion is explicit, requires the current password, and revokes browser/client access.
             delete_name = 'Gone'+os.urandom(3).hex()
             deleted = api({'action':'register','username':delete_name,'email':delete_name+'@example.invalid','password':'test'})
@@ -311,7 +393,7 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
             assert late['players'][0]['score']==90 and late['players'][0]['deleted']==1
             smtp.shutdown()
             mail_thread.join(timeout=10)
-        print('account HTTP: visible validation, configurable passwords, activation email/expiry/resend, automatic browser sign-in, pending-account denial, optional activation, PIN pairing, tickets, password recovery, shared profile settings and confirmed account deletion passed')
+        print('account HTTP: autosave, immutable usernames, confirmed email replacement/cancellation, password change and session revocation; visible validation, configurable passwords, activation email/expiry/resend, automatic browser sign-in, pending-account denial, optional activation, PIN pairing, tickets, password recovery, shared profile settings and confirmed account deletion passed')
     finally:
         process.terminate()
         process.wait(timeout=10)

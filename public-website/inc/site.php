@@ -24,6 +24,14 @@ function site(): array
 
 function h($s): string { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
+// A new content URL prevents long-lived browser caches from mixing old styles with new pages.
+function site_asset(string $path): string
+{
+    $path = '/' . ltrim($path, '/');
+    $file = __DIR__ . '/..' . $path;
+    return is_file($file) ? $path . '?v=' . substr(hash_file('sha256', $file), 0, 12) : $path;
+}
+
 function site_release_version(): string
 {
     // Source/build examples keep the explicit project version, independent of online releases.
@@ -62,7 +70,7 @@ function page_start(string $title, string $page, string $description = ''): void
 <meta property="og:image" content="<?= h($cfg['base_url']) ?>/assets/img/20261111-desktop-classic.png">
 <meta name="theme-color" content="#f5f2e9">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="/assets/site.css?v=20261114-accounts">
+<link rel="stylesheet" href="<?= h(site_asset('assets/site.css')) ?>">
 </head>
 <body class="page-<?= h($page) ?>">
 <a class="skip-link" href="#main">Skip to content</a>
@@ -109,7 +117,7 @@ function page_end(): void
     </div>
   </div>
 </footer>
-<script src="/assets/site.js?v=20261112-7" defer></script>
+<script src="<?= h(site_asset('assets/site.js')) ?>" defer></script>
 </body>
 </html>
 <?php

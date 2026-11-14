@@ -18,9 +18,15 @@ Cloud sign-in requires verified HTTPS. AmigaOS needs AmiSSL v5 with its current 
 
 ## Player settings and local caching
 
-Sign in at <https://openfp.retrocs.org/account/> to choose your avatar and favorite tank with a visual picker and base tank stats. Steering is changed in the client profile editor and automatically saved for that client platform; signing in on another platform does not change it. Rhino remains limited to enhanced worlds; Classic matches use the original tank classes.
+Sign in at <https://openfp.retrocs.org/account/> to choose your avatar and favorite tank with a visual picker and base tank stats. Selections save automatically; the status below the picker confirms when they are saved and offers a retry if the connection fails. Without JavaScript, a save button is available. Steering is changed in the client profile editor and automatically saved for that client platform; signing in on another platform does not change it. Rhino remains limited to enhanced worlds; Classic matches use the original tank classes.
 
 A cloud profile is cached locally with its identity, settings and session, so it can be selected without an internet connection for local split-screen and private servers. This does not bypass public-server authentication. Desktop clients refresh settings in the background when a cached profile is selected. Local edits are saved immediately and queued for cloud sync; pending local edits take priority over a remote refresh. On AmigaOS, explicit cloud sign-in refreshes preferences, and saving a profile uploads changes; an unavailable service leaves a pending local copy for the next sign-in/save. Sessions and identity keys are credentials: protect cached profile files. Account deletion cannot erase cached files on disconnected devices.
+
+## Email and password
+
+The username is permanent. Under **Account details**, choose **Change email** and enter the new address and current password. The current address remains active until you open the confirmation email and choose **Confirm email change**. Links last 24 hours and work once. Replacing or cancelling a pending request invalidates its old link. Email changes always require confirmation, even when registration activation is disabled; SMTP must be configured. Confirming an address invalidates outstanding password recovery links. A pending change is cancelled when the password is changed or reset.
+
+**Change password** requires the current password and two matching copies of the new password. The current browser stays signed in; other browser and game sessions and pending pairing requests are revoked. Avatar, tank, per-client steering and match history remain unchanged.
 
 ## Delete an account
 
@@ -39,7 +45,7 @@ cd /srv/www/vhosts/openfp.retrocs.org
 php inc/migrate.php up
 ```
 
-Schema 17 adds steering per client platform; schema 16 added shared preferences and anonymous match-history support; schema 15 added email activation to the accounts introduced in schema 14. Existing accounts remain active during the upgrade. Existing match history is retained but is not retroactively assigned to accounts. The website needs PHP 8.1+, PDO MySQL, sessions and OpenSSL. Serve `/account/`, `/account/pin` and `/account/api/` over HTTPS. Behind a reverse proxy, configure only the actual proxy addresses in `listing.trusted_proxies` and forward `X-Forwarded-Proto: https`.
+Schema 18 adds pending email confirmations; schema 17 added steering per client platform; schema 16 added shared preferences and anonymous match-history support; schema 15 added email activation to the accounts introduced in schema 14. Existing accounts remain active during the upgrade. Existing match history is retained but is not retroactively assigned to accounts. The website needs PHP 8.1+, PDO MySQL, sessions and OpenSSL. Serve `/account/`, `/account/pin` and `/account/api/` over HTTPS. Behind a reverse proxy, configure only the actual proxy addresses in `listing.trusted_proxies` and forward `X-Forwarded-Proto: https`.
 
 Copy the `accounts` and optional `smtp` sections from `public-website/config.inc.example.php` into the site's private configuration. `accounts.enabled` defaults to true; `accounts.session_days` defaults to 30 (range 1–90).
 
