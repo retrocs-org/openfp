@@ -8,18 +8,25 @@ if (!preg_match('/\Amysql:.*dbname=openfp_account_test(?:;|\z)/D',$dsn)) {
 $fixture=sys_get_temp_dir().'/ofp-accounts-'.bin2hex(random_bytes(8));mkdir($fixture,0700);mkdir($fixture.'/inc',0700);
 $secret=bin2hex(random_bytes(32));
 $config=['db'=>['dsn'=>$dsn,'user'=>getenv('OFP_ACCOUNT_TEST_USER')?:'root','password'=>getenv('OFP_ACCOUNT_TEST_PASSWORD')?:'','create_tables'=>true],
- 'accounts'=>['servers'=>['test'=>hash('sha256',$secret)]], 'smtp'=>[], 'listing'=>['trusted_proxies'=>['127.0.0.1/32']]];
+ 'accounts'=>['require_email_verification'=>false,'servers'=>['test'=>hash('sha256',$secret)]], 'smtp'=>[], 'listing'=>['trusted_proxies'=>['127.0.0.1/32']]];
 file_put_contents($fixture.'/config.inc.php',"<?php return ".var_export($config,true).';');
 foreach (['accounts','smtp','listing','migrations','map-catalog','reset-plan'] as $f) copy(__DIR__.'/../public-website/inc/'.$f.'.php',$fixture.'/inc/'.$f.'.php');
 require $fixture.'/inc/accounts.php';require $fixture.'/inc/smtp.php';require $fixture.'/inc/reset-plan.php';
 function account_check($v,string $m): void {if(!$v)throw new RuntimeException($m);}
 function account_reject(callable $f,string $m): void {try{$f();}catch(InvalidArgumentException $e){return;}throw new RuntimeException($m);}
 try {
- $db=ofp_db();account_check(ofp_schema_version($db)===14,'migration reaches 14');account_check(ofp_migrate($db)===[],'migration is idempotent');
+ $db=ofp_db();account_check(ofp_schema_version($db)===15,'migration reaches 15');account_check(ofp_migrate($db)===[],'migration is idempotent');
  // Exercise upgrading an existing version 13 schema, as well as fresh installation.
  foreach (array_filter(ofp_reset_tables(),fn($t)=>str_starts_with($t,'account_')||$t==='accounts') as $t) $db->exec("DROP TABLE $t");
  $db->exec('ALTER TABLE servers DROP COLUMN cloud_server');$db->exec("UPDATE ofp_meta SET v='13' WHERE k='schema_version'");
- account_check(count(ofp_migrate($db))===1&&ofp_schema_version($db)===14,'version 13 upgrades to 14');
+ account_check(count(ofp_migrate($db))===2&&ofp_schema_version($db)===15,'version 13 upgrades to 15');
+ // A pre-activation account remains active when version 14 is upgraded.
+ $legacy=bin2hex(random_bytes(16));
+ $db->exec('DROP TABLE account_verifications');$db->exec('ALTER TABLE accounts DROP COLUMN email_verified');
+ $db->exec("UPDATE ofp_meta SET v='14' WHERE k='schema_version'");
+ $db->prepare('INSERT INTO accounts VALUES(?,?,?,?,?,?,?,?)')->execute([$legacy,'Legacy','legacy','legacy@example.invalid',password_hash('legacy-fixture-password',PASSWORD_DEFAULT),bin2hex(random_bytes(32)),time(),time()]);
+ account_check(count(ofp_migrate($db))===1&&ofp_schema_version($db)===15,'version 14 upgrades to 15');
+ account_check((int)$db->query("SELECT email_verified FROM accounts WHERE username='Legacy'")->fetchColumn()===1,'existing accounts stay active');
  $id=ofp_account_register($db,'Pilot','pilot@example.invalid','fixture-password-123');
  account_reject(fn()=>ofp_account_register($db,'pilot','other@example.invalid','fixture-password-123'),'case-insensitive duplicate rejected');
  account_reject(fn()=>ofp_account_register($db,'Other','PILOT@example.invalid','fixture-password-123'),'duplicate email rejected');
@@ -56,8 +63,45 @@ try {
  $_SERVER=['HTTPS'=>'off','REMOTE_ADDR'=>'203.0.113.2','HTTP_X_FORWARDED_PROTO'=>'https'];account_check(!ofp_account_https(),'untrusted TLS header ignored');
  $_SERVER['REMOTE_ADDR']='127.0.0.1';account_check(ofp_account_https(),'trusted proxy accepted');
  ofp_reset_data($db);foreach(ofp_reset_tables() as $t)account_check((int)$db->query("SELECT COUNT(*) FROM $t")->fetchColumn()===0,'reset empties '.$t);
- account_check(ofp_schema_version($db)===14,'reset preserves schema');
- echo "accounts: migration 13→14, registration, passwords, sessions, tickets, PIN pairing, recovery, limits and full reset passed\n";
+ account_check(ofp_schema_version($db)===15,'reset preserves schema');
+ // Configuration is read once per PHP request: use fresh processes for policy variants.
+ $policy=<<<'PHP'
+require $argv[1].'/inc/accounts.php';
+$expected=(int)$argv[2];
+if(ofp_account_config()['password_min_length']!==$expected)exit(1);
+try{ofp_account_password('test');$accepted=true;}catch(InvalidArgumentException $e){$accepted=false;}
+if($accepted!==($expected===4))exit(2);
+try{ofp_account_password(str_repeat('é',37));exit(3);}catch(InvalidArgumentException $e){}
+if(ofp_account_config()['require_email_verification']){
+ $db=ofp_db();$id=bin2hex(random_bytes(16));$key=bin2hex(random_bytes(32));
+ $db->prepare('INSERT INTO accounts VALUES(?,?,?,?,?,?,?,?,?)')->execute([$id,'Pending','pending','pending@example.invalid',password_hash('pending-password-123',PASSWORD_DEFAULT),$key,time(),time(),0]);
+ try{ofp_account_login($db,'Pending','pending-password-123');exit(4);}catch(InvalidArgumentException $e){}
+ try{ofp_account_session($db,$id);exit(5);}catch(InvalidArgumentException $e){}
+ $session=bin2hex(random_bytes(32));$db->prepare('INSERT INTO account_sessions VALUES(?,?,?)')->execute([hash('sha256',$session),$id,time()+60]);
+ if(ofp_account_from_token($db,$session))exit(6);
+ $d=ofp_device_start($db);if(ofp_device_approve($db,$d['pin'],$id))exit(7);
+ $db->prepare('UPDATE account_devices SET account_id=? WHERE pin=?')->execute([$id,$d['pin']]);
+ if(ofp_device_poll($db,$d['device']))exit(8);
+ $sid=str_repeat('02',16);$nonce='123456789abcdef0';$kid=substr(hash('sha256',hash('sha256',hex2bin($key).hex2bin($sid),true)),0,32);
+ try{ofp_cloud_ticket($db,['id'=>$id],'test',$sid,$nonce,$kid);exit(9);}catch(InvalidArgumentException $e){}
+ $ticket=bin2hex(random_bytes(32));$db->prepare('INSERT INTO account_tickets VALUES(?,?,?,?,?,?,?)')->execute([hash('sha256',$ticket),$id,'test',$sid,$nonce,$kid,time()+60]);
+ if(ofp_cloud_verify($db,$ticket,'test',$sid,$nonce,$kid))exit(10);
+ $token=bin2hex(random_bytes(32));$db->prepare('INSERT INTO account_verifications VALUES(?,?,?)')->execute([hash('sha256',$token),$id,time()-1]);
+ if(ofp_account_activate($db,$token))exit(11);
+ $db->exec('UPDATE account_verifications SET expires='.(time()+60));
+ if(!ofp_account_activate($db,$token)||ofp_account_activate($db,$token)||!ofp_account_login($db,'Pending','pending-password-123'))exit(12);
+ try{ofp_account_register($db,'NoMail','nomail@example.invalid','pending-password-123');exit(13);}catch(InvalidArgumentException $e){}
+ if((int)$db->query("SELECT COUNT(*) FROM accounts WHERE username='NoMail'")->fetchColumn())exit(14);
+}
+PHP;
+ foreach ([[4,false,4],[1,false,4],[100,false,72],[12,true,12]] as [$min,$verification,$expected]) {
+     $config['accounts']['password_min_length']=$min;$config['accounts']['require_email_verification']=$verification;
+     file_put_contents($fixture.'/config.inc.php',"<?php return ".var_export($config,true).';');
+     $command=escapeshellarg(PHP_BINARY).' -r '.escapeshellarg($policy).' '.escapeshellarg($fixture).' '.$expected;
+     passthru($command,$status);account_check($status===0,'password and activation policy variant '.$min.' returned '.$status);
+ }
+ ofp_reset_data($db);
+ echo "accounts: migrations 13/14→15, password policy, pending-account restrictions, activation, sessions, tickets, PIN pairing, recovery and full reset passed\n";
 } finally {
  foreach(glob($fixture.'/inc/*') as $f)unlink($f);rmdir($fixture.'/inc');unlink($fixture.'/config.inc.php');rmdir($fixture);
 }

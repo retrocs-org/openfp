@@ -381,6 +381,14 @@ body.zoom-open { overflow:hidden; }
 .control-bindings.numbered dt { padding-left:27px; position:relative; }
 .control-bindings dt span { position:absolute; left:0; top:2px; width:19px; height:19px; border-radius:50%; background:var(--amber); color:var(--panel); font:700 11px/19px var(--sans); text-align:center; }
 .control-note { font-size:13px; color:var(--muted); margin:18px 0 0; }
+.account-form { display:grid; gap:18px; width:100%; max-width:38rem; margin:28px 0; }
+.account-form label { display:grid; gap:6px; font-weight:600; }
+.account-form input:not([type=hidden]) { width:100%; min-width:0; padding:12px; border:1px solid var(--line); border-radius:var(--radius); background:var(--panel); color:var(--text); }
+.account-form .btn { justify-self:start; max-width:100%; }
+.account-form p { margin:0; }
+.account-form .account-hint { margin-top:-10px; font-size:13px; color:var(--muted); }
+.account-error { border-left:4px solid var(--bad); }
+.account-links { display:flex; flex-wrap:wrap; gap:10px 22px; margin-top:22px; font-size:14px; }
 .control-grid + .control-note { margin-bottom:28px; }
 .control-card kbd { font:600 12px var(--mono); padding:1px 4px; background:var(--bg2); border:1px solid var(--line); border-radius:3px; }
 @media (max-width:700px) {

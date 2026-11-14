@@ -26,7 +26,11 @@ try {
     ofp_account_prune($db);
     if ($action==='login' || $action==='register') {
         if (!ofp_account_rate($db,'username:'.strtolower(substr($get('username'),0,15)),40,600)) account_reply(429,['error'=>'Too many attempts. Try again later.']);
-        if ($action==='register') ofp_account_register($db,$get('username'),$get('email'),$get('password'));
+        if ($action==='register') {
+            ofp_account_register($db,$get('username'),$get('email'),$get('password'));
+            if (ofp_account_config()['require_email_verification'])
+                account_reply(202,['status'=>'verification_required','message'=>'Check your email to activate your account, then sign in.']);
+        }
         $a=ofp_account_login($db,$get('username'),$get('password'));
         if (!$a) account_reply(401,['error'=>'Username or password is incorrect.']);
     } elseif ($action==='device_start') {

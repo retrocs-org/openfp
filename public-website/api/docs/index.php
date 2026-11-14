@@ -50,7 +50,7 @@ curl 'https://openfp.retrocs.org/api/?action=matches&amp;limit=10'</code></pre>
   <h2 id="accounts">Cloud accounts</h2>
   <p>Account requests use <code>POST https://openfp.retrocs.org/account/api/</code> with an URL-encoded body. HTTPS is required. Replies are newline-separated <code>key=value</code> fields with <code>Cache-Control: no-store</code>. Never log passwords, session tokens or server secrets.</p>
   <div class="wrap-table"><table><thead><tr><th>Action</th><th>Fields</th><th>Reply</th></tr></thead><tbody>
-  <tr><td><code>register</code></td><td><code>username, email, password</code></td><td><code>id, username, key, session</code></td></tr>
+  <tr><td><code>register</code></td><td><code>username, email, password</code></td><td>202 with <code>status=verification_required</code> and <code>message</code> when activation is required; no credentials until activated. Otherwise 200 with <code>id, username, key, session</code>.</td></tr>
   <tr><td><code>login</code></td><td><code>username, password</code></td><td><code>id, username, key, session</code></td></tr>
   <tr><td><code>device_start</code></td><td>None; Apple TV pairing</td><td><code>device, pin, url</code>; ten-minute lifetime</td></tr>
   <tr><td><code>device_poll</code></td><td><code>device</code>; poll every five seconds</td><td>202 with <code>status=pending</code>, or 200 with account fields once approved; single use</td></tr>
@@ -58,7 +58,7 @@ curl 'https://openfp.retrocs.org/api/?action=matches&amp;limit=10'</code></pre>
   <tr><td><code>verify</code></td><td><code>server, secret, ticket, server_id, nonce, key_id</code>; registered server only</td><td><code>id, username</code></td></tr>
   <tr><td><code>logout</code></td><td><code>session</code></td><td><code>status=signed out</code>; revokes that session</td></tr>
   </tbody></table></div>
-  <p>Errors contain <code>error</code>: 400 invalid fields, 401 bad credentials or expired session, 403 invalid server/ticket, 413 oversized body, 426 HTTPS required, 429 rate limit, 503 unavailable. Account bodies are limited to 4 KiB. Client sessions last 30 days by default. PIN approval uses the browser page <a href="/account/pin">/account/pin</a>, with account sign-in and CSRF protection. Read the <a href="/documentation/accounts/">account guide</a> for identity-key derivation and operator setup.</p>
+  <p>Errors contain <code>error</code>: 400 invalid fields or email activation still required, 401 bad credentials or expired session, 403 invalid server/ticket, 413 oversized body, 426 HTTPS required, 429 rate limit, 503 unavailable. Account bodies are limited to 4 KiB. Client sessions last 30 days by default. The password minimum is configurable (default 12 characters; maximum 72 bytes). Email activation links last 24 hours; confirmation and resending use the <a href="/account/">account page</a>. PIN approval uses the browser page <a href="/account/pin">/account/pin</a>, with account sign-in and CSRF protection. Read the <a href="/documentation/accounts/">account guide</a> for identity-key derivation and operator setup.</p>
 
   <h2 id="report">Dedicated-server reporting</h2>
   <p>All server reporting and polling requests require HTTPS and <code>cloud_server</code> plus <code>cloud_secret</code>, issued by the site operator. These are separate from player credentials. A registration owns its announced host/port. See <a href="/documentation/accounts/">server registration</a>.</p>

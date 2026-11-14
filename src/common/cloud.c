@@ -65,6 +65,10 @@ int cloud_login(CloudAccount *a,const char *name,const char *email,const char *p
     http_form(body,sizeof body,"action",create?"register":"login");http_form(body,sizeof body,"username",name);
     http_form(body,sizeof body,"email",email);http_form(body,sizeof body,"password",password);
     status=request(body,reply,sizeof reply,error);memset(body,0,sizeof body);
+    if(status==202) {
+        if(!cloud_field(reply,"message",error,96))snprintf(error,96,"Check your email to activate your account, then sign in.");
+        return -1;
+    }
     return status==200?account_reply(reply,a,error):-1;
 }
 int cloud_device_start(CloudDevice *d,char error[96]) {

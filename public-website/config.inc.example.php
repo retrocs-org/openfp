@@ -27,6 +27,8 @@ return [
     'accounts' => [
         'enabled' => true,
         'session_days' => 30,
+        'password_min_length' => 12, // characters; configurable from 4 to 72 (72-byte maximum)
+        'require_email_verification' => true, // SMTP required; false allows immediate activation
         // Register each public dedicated server. Generate its secret and hash with:
         // php inc/cloud-server.php SERVER_NAME
         'servers' => [

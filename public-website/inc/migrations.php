@@ -106,6 +106,11 @@ function ofp_migrations(): array
             "CREATE INDEX IF NOT EXISTS sessions_expires ON account_sessions (expires)",
 
         ]],
+        15 => ['optional email activation and single-use verification links (0.1)', [
+            // Existing accounts stay active; new registrations explicitly set their activation state.
+            "ALTER TABLE accounts ADD COLUMN IF NOT EXISTS email_verified TINYINT UNSIGNED NOT NULL DEFAULT 1",
+            "CREATE TABLE IF NOT EXISTS account_verifications (token_hash CHAR(64) NOT NULL PRIMARY KEY, account_id CHAR(32) NOT NULL, expires BIGINT NOT NULL, KEY verification_account (account_id), KEY verification_expires (expires)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        ]],
     ];
 }
 

@@ -81,6 +81,9 @@ int main(void){
     tls=0;before=calls;CHECK(cloud_login(&a,"Pilot","","testpassword123",0,error)==-1&&calls==before);tls=1;
     strcpy(response,"error=Username or password is incorrect.\n");status=401;
     CHECK(cloud_login(&a,"Pilot","","wrong",0,error)==-1&&strstr(error,"incorrect"));
+    status=202;strcpy(response,"status=verification_required\nmessage=Check your email to activate your account, then sign in.\n");
+    memset(&a,0,sizeof a);error[0]=0;
+    CHECK(cloud_login(&a,"Pilot","pilot@example.invalid","testpassword123",1,error)==-1&&strstr(error,"Check your email")&&!a.session[0]);
     status=200;strcpy(response,"username=Pilot\nkey=broken\nsession=broken\n");CHECK(cloud_login(&a,"Pilot","","x",0,error)==-1);
     snprintf(response,sizeof response,"device=%064d\npin=ABCD2345\n",3);CHECK(!cloud_device_start(&d,error));
     CHECK(!strcmp(d.pin,"ABCD2345"));status=202;strcpy(response,"status=pending\n");CHECK(cloud_device_poll(&d,&a,error)==0);

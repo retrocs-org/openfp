@@ -11,7 +11,7 @@ page_start('Privacy', 'privacy', 'What the OpenFP web site keeps, and for how lo
   <h2>What's kept, and for how long</h2>
   <table class="board"><thead><tr><th>What</th><th>Why</th><th>How long</th></tr></thead><tbody>
     <tr><td>Cloud account: username, email, password hash, identity key and creation date</td><td>Sign-in, recovery and consistent public player identity</td><td>Until the account is deleted</td></tr>
-    <tr><td>Hashed client sessions, pairing PINs and reset tokens</td><td>Remember sign-in, connect Apple TV and recover passwords</td><td>Sessions: 30 days by default; pairing: 10 minutes; reset links: 30 minutes. Expired rows are pruned when account services run.</td></tr>
+    <tr><td>Hashed client sessions, pairing PINs, activation and reset tokens</td><td>Remember sign-in, confirm email addresses, connect Apple TV and recover passwords</td><td>Sessions: 30 days by default; pairing: 10 minutes; activation links: 24 hours; reset links: 30 minutes. Expired rows are pruned when account services run.</td></tr>
     <tr><td>Hashed rate-limit buckets</td><td>Limit repeated account requests</td><td>At most one day after the last request, pruned when account services run</td></tr>
     <tr><td>Public game servers: their address, name, settings and who's on them right now (player names)</td><td>the server list</td><td>until 3 minutes after the server stops announcing itself</td></tr>
     <tr><td>Player counts per server</td><td>the charts</td><td>7 days</td></tr>

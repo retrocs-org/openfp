@@ -8,7 +8,9 @@ On macOS, Windows and Linux, choose **Cloud profile** in the profile picker. Sig
 
 Apple TV uses pairing instead of typing credentials on the television. Choose **Cloud profile**, open <https://openfp.retrocs.org/account/pin> on your phone or computer, enter the displayed PIN and sign in. The PIN expires after ten minutes and can only be approved once. A PIN alone cannot sign in to an account.
 
-Usernames contain 3–15 letters, numbers or underscores and start with a letter. Passwords contain 12–72 bytes. Account names are unique without regard to case. The account's username is used on public servers. One account can occupy one connection to a given server at a time; each split-screen player needs their own account.
+Usernames contain 3–15 letters, numbers or underscores and start with a letter. Passwords need at least 12 characters by default, with a maximum of 72 bytes. The site operator can lower or raise the minimum. The form shows the current rule and displays validation errors on the page. Account names are unique without regard to case. The account's username is used on public servers. One account can occupy one connection to a given server at a time; each split-screen player needs their own account.
+
+New accounts require email activation by default. Open the emailed link and choose **Activate account**, then sign in on the website or in the game. Links expire after 24 hours and work once. **Resend activation email** issues a replacement link, at most once per minute. Pending accounts cannot sign in, join a public server or approve Apple TV pairing. Account creation in a game client displays an instruction to check your email. An expired link can be replaced on the website.
 
 Clients store a login session and a player identity key, never the password. Sessions last 30 days by default. Protect the profile/settings files as account credentials. To renew an expired session, open **Cloud profile** and sign in again; the existing profile is updated. Deleting a profile on a device removes its local copy; it does not delete the central account.
 
@@ -23,9 +25,21 @@ cd /srv/www/vhosts/openfp.retrocs.org
 php inc/migrate.php up
 ```
 
-Schema 14 adds accounts, sessions, pairing PINs and account-linked match results. Existing match history is retained but is not retroactively assigned to accounts. The website needs PHP 8.1+, PDO MySQL, sessions and OpenSSL. Serve `/account/`, `/account/pin` and `/account/api/` over HTTPS. Behind a reverse proxy, configure only the actual proxy addresses in `listing.trusted_proxies` and forward `X-Forwarded-Proto: https`.
+Schema 15 adds email activation to the accounts introduced in schema 14. Existing accounts remain active during the upgrade. Existing match history is retained but is not retroactively assigned to accounts. The website needs PHP 8.1+, PDO MySQL, sessions and OpenSSL. Serve `/account/`, `/account/pin` and `/account/api/` over HTTPS. Behind a reverse proxy, configure only the actual proxy addresses in `listing.trusted_proxies` and forward `X-Forwarded-Proto: https`.
 
 Copy the `accounts` and optional `smtp` sections from `public-website/config.inc.example.php` into the site's private configuration. `accounts.enabled` defaults to true; `accounts.session_days` defaults to 30 (range 1–90).
+
+```php
+'accounts' => [
+    'enabled' => true,
+    'session_days' => 30,
+    'password_min_length' => 12,
+    'require_email_verification' => true,
+    'servers' => [ /* preserve your registered server hashes here */ ],
+],
+```
+
+`password_min_length` accepts 4–72 characters (values outside that range are clamped); the 72-byte maximum still applies. Set it to `4` to permit a password such as `test`; the default remains `12`. The minimum applies to new accounts and password changes, not existing sign-ins. Set `require_email_verification` to `false` to allow immediate sign-in without activation or SMTP. New accounts created with verification disabled remain active if verification is enabled later. Disabling verification also allows currently pending accounts to sign in while it is off. With verification enabled, SMTP must be configured; registration shows a clear error if mail is unavailable instead of silently activating the account. If delivery fails after creation, the account stays pending and the player can request another email. Changing the minimum or activation policy takes effect on the next request.
 
 ## Register a dedicated server
 
@@ -50,7 +64,7 @@ Rebuild/update the dedicated server and clients together: this change uses netwo
 
 ## SMTP and recovery
 
-An empty `smtp.host` or invalid/empty `smtp.from` disables password recovery automatically. Account creation and ordinary sign-in still work. The recovery link appears only when SMTP is configured.
+An empty `smtp.host` or invalid/empty `smtp.from` disables password recovery automatically. Existing active accounts can still sign in. Creating an account without SMTP requires `accounts.require_email_verification = false`. The recovery link appears only when SMTP is configured.
 
 ```php
 'smtp' => [
@@ -83,7 +97,7 @@ To deliberately start over, stop dedicated servers and website background worker
 php inc/reset-data.php --confirm ERASE-ALL-USER-DATA
 ```
 
-It deletes all accounts, sessions, pairing requests, account statistics, leaderboards, match history, replays, daily results, community maps and transient server-list data in a transaction. It preserves the schema, configuration and built-in map files. It does not modify databases/logs stored separately by dedicated servers; reset those separately if a complete service reset is intended.
+It deletes all accounts, sessions, activation links, pairing requests, account statistics, leaderboards, match history, replays, daily results, community maps and transient server-list data in a transaction. It preserves the schema, configuration and built-in map files. It does not modify databases/logs stored separately by dedicated servers; reset those separately if a complete service reset is intended.
 
 ## Verification
 
@@ -94,6 +108,6 @@ OFP_ACCOUNT_TEST_DSN='mysql:host=127.0.0.1;dbname=openfp_account_test;charset=ut
 OFP_ACCOUNT_TEST_USER=testuser OFP_ACCOUNT_TEST_PASSWORD=... php tests/test_accounts.php
 ```
 
-Run `python3 tests/test_account_http.py` with the same database environment to verify browser sign-in, CSRF protection, Apple TV PIN approval, one-use join tickets and SMTP password recovery through a temporary local website. It does not use the deployed site.
+Run `python3 tests/test_account_http.py` with the same database environment to verify visible form errors, configurable passwords, email activation and expiry/resending, browser sign-in, CSRF protection, Apple TV PIN approval, one-use join tickets and SMTP password recovery through a temporary local website. It does not use the deployed site.
 
 Never point the test at a production database. The test refuses database names other than `openfp_account_test`.

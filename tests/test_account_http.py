@@ -36,10 +36,12 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
     secret = os.urandom(32).hex()
     config = {'db': {'dsn': dsn, 'user': os.environ.get('OFP_ACCOUNT_TEST_USER', 'root'),
                      'password': os.environ.get('OFP_ACCOUNT_TEST_PASSWORD', ''), 'create_tables': True},
-              'accounts': {'servers': {'fixture': hashlib.sha256(secret.encode()).hexdigest()}},
+              'accounts': {'require_email_verification': False, 'servers': {'fixture': hashlib.sha256(secret.encode()).hexdigest()}},
               'smtp': {}, 'listing': {'probe': False, 'trusted_proxies': []}}
-    payload = base64.b64encode(json.dumps(config).encode()).decode()
-    (fixture / 'config.inc.php').write_text("<?php return json_decode(base64_decode('" + payload + "'), true);")
+    def write_config():
+        payload = base64.b64encode(json.dumps(config).encode()).decode()
+        (fixture / 'config.inc.php').write_text("<?php return json_decode(base64_decode('" + payload + "'), true);")
+    write_config()
     # Simulated TLS exists only in this temporary test router. Production has no such switch.
     (fixture / 'router.php').write_text("<?php $_SERVER['HTTPS']=isset($_SERVER['HTTP_X_OFP_FIXTURE_INSECURE'])?'off':'on'; return false;")
     port = free_port()
@@ -51,9 +53,10 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
             try:
                 with socket.create_connection(('127.0.0.1', port), timeout=.1): break
             except OSError: time.sleep(.05)
+        fixture_ip = '127.0.0.1'
         def request(path, values=None, cookie='', insecure=False):
             connection = http.client.HTTPConnection('127.0.0.1', port, timeout=20)
-            headers = {'Cookie': cookie}
+            headers = {'Cookie': cookie, 'X-Forwarded-For': fixture_ip}
             if insecure: headers['X-OFP-Fixture-Insecure'] = '1'
             if values is not None: headers['Content-Type'] = 'application/x-www-form-urlencoded'
             connection.request('POST' if values is not None else 'GET', path,
@@ -123,17 +126,15 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
                     else: self.wfile.write(b'500 unsupported\r\n')
         with socketserver.TCPServer(('127.0.0.1', 0), SMTP) as smtp:
             smtp.timeout = 10
-            mail_thread = threading.Thread(target=smtp.handle_request)
+            mail_thread = threading.Thread(target=smtp.serve_forever, daemon=True)
             mail_thread.start()
             config['smtp'] = {'host': '127.0.0.1', 'port': smtp.server_address[1], 'encryption': 'none',
                               'from': 'fixture@example.invalid', 'ehlo': 'localhost'}
-            payload = base64.b64encode(json.dumps(config).encode()).decode()
-            (fixture / 'config.inc.php').write_text("<?php return json_decode(base64_decode('" + payload + "'), true);")
+            write_config()
             _, headers, body = request('/account/?mode=recover', cookie=cookie)
             assert 'Send recovery link' in body
             _, _, body = request('/account/?mode=recover', {'action': 'recover', 'csrf': csrf(body), 'email': name+'@example.invalid'}, cookie)
-            mail_thread.join(timeout=10)
-            assert not mail_thread.is_alive() and len(delivered) == 1
+            assert len(delivered) == 1
             assert 'a recovery link will be sent' in body
             reset = re.search(r'/account/\?reset=([0-9a-f]{64})', delivered[0]).group(1)
             _, _, body = request('/account/?reset='+reset, cookie=cookie)
@@ -142,7 +143,84 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
             api({'action': 'login', 'username': name, 'password': password}, 401)
             api({'action': 'login', 'username': name, 'password': 'new-http-fixture-password'})
             api(dict(binding, action='ticket', session=account['session']), 401)
-        print('account HTTP: HTTPS, credentials, CSRF, secure browser sessions, PIN approval, tickets, logout and SMTP password recovery passed')
+            # New accounts need email activation by default. The form must show server-side
+            # validation errors instead of silently failing browser minlength validation.
+            config['accounts'].pop('require_email_verification')
+            config['listing']['trusted_proxies'] = ['127.0.0.1']
+            fixture_ip = '203.0.113.10'
+            write_config()
+            _, headers, body = request('/account/?mode=register')
+            browser = session(headers)
+            assert 'novalidate' in body and 'minlength="12"' in body and 'At least 12 characters' in body
+            short_name = 'Short' + os.urandom(3).hex()
+            short_email = short_name+'@example.invalid'
+            _, _, body = request('/account/?mode=register', {'action':'register', 'csrf':csrf(body),
+                                    'username':short_name, 'email':short_email, 'password':'test'}, browser)
+            assert 'role="alert"' in body and 'Use at least 12 characters' in body
+            assert f'value="{short_name}"' in body and f'value="{short_email}"' in body
+            assert 'value="test"' not in body
+            config['accounts']['password_min_length'] = 4
+            write_config()
+            _, _, body = request('/account/?mode=register', {'action':'register', 'csrf':csrf(body),
+                                    'username':short_name, 'email':short_email, 'password':'test'}, browser)
+            assert 'Account created. Check your email' in body and 'Resend activation email' in body
+            assert 'Signed in as' not in body and len(delivered) == 2
+            pending_name = 'Wait' + os.urandom(4).hex()
+            pending_email = pending_name+'@example.invalid'
+            pending = api({'action':'register', 'username':pending_name, 'email':pending_email, 'password':'test'}, 202)
+            assert pending['status'] == 'verification_required' and not any(k in pending for k in ['id','key','session'])
+            assert len(delivered) == 3
+            api({'action':'login', 'username':pending_name, 'password':'test'}, 400)
+            _, _, body = request('/account/pin/', cookie=browser)
+            _, _, denied = request('/account/pin/', {'action':'login', 'csrf':csrf(body), 'pin':device['pin'],
+                                    'username':pending_name, 'password':'test'}, browser)
+            assert 'Activate your account using the email link' in denied and 'Apple TV connected' not in denied
+            activation = re.search(r'/account/\?verify=([0-9a-f]{64})', delivered[-1]).group(1)
+            _, _, body = request('/account/?verify='+activation, cookie=browser)
+            assert 'Activate account' in body  # opening a link does not activate it
+            api({'action':'login', 'username':pending_name, 'password':'test'}, 400)
+            def database(code, *args):
+                return subprocess.check_output(['php','-r','require $argv[1]."/inc/accounts.php"; $db=ofp_db(); '+code,
+                                                str(fixture), *args], env=env).decode()
+            assert database('$q=$db->prepare("SELECT v.token_hash FROM account_verifications v JOIN accounts a ON a.id=v.account_id WHERE a.username=?"); $q->execute([$argv[2]]); echo $q->fetchColumn();', pending_name) == hashlib.sha256(activation.encode()).hexdigest()
+            database('$q=$db->prepare("UPDATE account_verifications v JOIN accounts a ON a.id=v.account_id SET v.expires=1 WHERE a.username=?"); $q->execute([$argv[2]]);', pending_name)
+            _, _, expired = request('/account/', {'action':'activate','csrf':csrf(body),'verification_token':activation}, browser)
+            assert 'activation link has expired' in expired
+            _, _, body = request('/account/?mode=activation', cookie=browser)
+            _, _, body = request('/account/?mode=activation', {'action':'resend','csrf':csrf(body),'email':pending_email}, browser)
+            assert len(delivered) == 3  # one email per account per minute
+            database('$q=$db->prepare("SELECT id FROM accounts WHERE username=?"); $q->execute([$argv[2]]); $id=$q->fetchColumn(); $db->prepare("UPDATE account_limits SET started=1 WHERE bucket=?")->execute([hash("sha256","activation:".$id)]);', pending_name)
+            _, _, body = request('/account/?mode=activation', {'action':'resend','csrf':csrf(body),'email':pending_email}, browser)
+            assert len(delivered) == 4
+            replacement = re.search(r'/account/\?verify=([0-9a-f]{64})', delivered[-1]).group(1)
+            assert replacement != activation
+            _, _, bad = request('/account/', {'action':'activate','csrf':csrf(body),'verification_token':activation}, browser)
+            assert 'activation link has expired' in bad
+            _, _, bad = request('/account/', {'action':'activate','csrf':'wrong','verification_token':replacement}, browser)
+            assert 'Reload the page' in bad
+            _, _, body = request('/account/', {'action':'activate','csrf':csrf(body),'verification_token':replacement}, browser)
+            assert 'Email confirmed. Your account is active' in body
+            active = api({'action':'login','username':pending_name,'password':'test'})
+            assert len(active['session']) == 64
+            _, _, body = request('/account/', {'action':'activate','csrf':csrf(body),'verification_token':replacement}, browser)
+            assert 'activation link has expired' in body
+            # No SMTP bypass: enabling activation without mail blocks registration clearly.
+            config['smtp'] = {}
+            write_config()
+            unavailable = api({'action':'register','username':'NoMail'+os.urandom(2).hex(),
+                               'email':'nomail@example.invalid','password':'test'}, 400)
+            assert 'email activation needs the site mail service' in unavailable['error']
+            # Disabling activation permits immediate sign-in, including accounts still pending.
+            config['accounts']['require_email_verification'] = False
+            fixture_ip = '203.0.113.11'
+            write_config()
+            api({'action':'login','username':short_name,'password':'test'})
+            immediate = api({'action':'register','username':'Now'+os.urandom(3).hex(),
+                             'email':'now'+os.urandom(3).hex()+'@example.invalid','password':'test'})
+            assert len(immediate['session']) == 64 and len(delivered) == 4
+            smtp.shutdown()
+            mail_thread.join(timeout=10)
+        print('account HTTP: visible validation, configurable passwords, activation email/expiry/resend, pending-account denial, optional activation, PIN pairing, tickets and password recovery passed')
     finally:
         process.terminate()
         process.wait(timeout=10)
