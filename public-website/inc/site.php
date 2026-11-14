@@ -49,7 +49,7 @@ function page_start(string $title, string $page, string $description = ''): void
     $nav = ['index' => ['Home', '/'],
             'servers' => ['Servers', '/server/'], 'statistics' => ['Statistics', '/statistics/'],
             'maps' => ['Maps', '/maps/'], 'documentation' => ['Documentation', '/documentation/'],
-            'source' => ['Source', '/source/']];
+            'source' => ['Source', '/source/'], 'account' => ['Account', '/account/']];
     ?><!doctype html>
 <html lang="en">
 <head>
@@ -101,7 +101,6 @@ function page_end(): void
     </div>
     <div class="foot-links">
       <a href="/credits/">Credits</a>
-      <a href="/account/">Cloud account</a>
       <a href="/privacy/">Privacy</a>
       <a href="/documentation/">Documentation</a>
       <a href="/api/docs/">API</a>
