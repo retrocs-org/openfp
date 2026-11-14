@@ -44,6 +44,29 @@ elseif ($verify !== '') $mode = 'verify';
 $emailToken = $get('email_change_token') ?: $query('confirm_email');
 if ($emailToken !== '') $mode = 'confirm_email';
 $pinPage = defined('OFP_PIN_PAGE');
+// A valid emailed token confirms the address and signs in to its account in one visit.
+function ofp_account_web_confirm(PDO $db, string $token, bool $emailChange): never {
+    $account = $emailChange ? ofp_account_confirm_email($db, $token) : ofp_account_activate($db, $token);
+    if (!$account) throw new InvalidArgumentException($emailChange
+        ? 'This email change link has expired or was already used. Request a new link from your account page.'
+        : 'This activation link has expired or was already used. Request a new activation email.');
+    ofp_account_web_sign_in($account);
+    $_SESSION['notice'] = $emailChange
+        ? 'Your new email address is confirmed and you are signed in. Your username is unchanged.'
+        : 'Email confirmed. Your account is active and you are signed in.';
+    header('Location: /account/', true, 303); exit;
+}
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && ($verify !== '' || $emailToken !== '')) {
+    try {
+        if (!$secure) throw new InvalidArgumentException('Use HTTPS to confirm your email and sign in.');
+        if (!ofp_account_config()['enabled']) throw new InvalidArgumentException('Cloud accounts are disabled.');
+        $db = ofp_db();
+        if (!ofp_account_rate($db, 'email-link:' . ofp_client_ip(), 20, 600))
+            throw new InvalidArgumentException('Too many attempts. Try again later.');
+        ofp_account_web_confirm($db, $emailToken ?: $verify, $emailToken !== '');
+    } catch (InvalidArgumentException $e) { $error = $e->getMessage(); }
+      catch (Throwable $e) { error_log('OpenFP email confirmation failed: ' . $e->getMessage()); $error = 'Account service unavailable. Try again later.'; }
+}
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     $action = $get('action');
     if ($action === 'register') $mode = 'register';
@@ -87,9 +110,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         } elseif ($action === 'logout') {
             $_SESSION = []; session_regenerate_id(true); header('Location: /account/'); exit;
         } elseif ($action === 'confirm_email') {
-            if (!ofp_account_confirm_email($db, $emailToken)) throw new InvalidArgumentException('This email change link has expired or was already used. Request a new link from your account page.');
-            $_SESSION['notice'] = 'Your new email address is confirmed. Your username is unchanged.';
-            header('Location: /account/', true, 303); exit;
+            ofp_account_web_confirm($db, $emailToken, true);
         } elseif ($action === 'recover') {
             if (!ofp_smtp_ready()) throw new InvalidArgumentException('Password recovery is disabled.');
             if (!filter_var($get('email'), FILTER_VALIDATE_EMAIL)) throw new InvalidArgumentException('Enter a valid email address.');
@@ -102,11 +123,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             $_SESSION = []; session_regenerate_id(true); $_SESSION['csrf'] = bin2hex(random_bytes(32));
             $message = 'Password changed. Sign in again on your devices.'; $mode = 'login'; $reset = '';
         } elseif ($action === 'activate') {
-            $a = ofp_account_activate($db, $verify);
-            if (!$a) throw new InvalidArgumentException('This activation link has expired or was already used. Request a new activation email.');
-            ofp_account_web_sign_in($a);
-            $_SESSION['notice'] = 'Email confirmed. Your account is active and you are signed in.';
-            header('Location: /account/', true, 303); exit;
+            ofp_account_web_confirm($db, $verify, false);
         } elseif ($action === 'resend') {
             if (!filter_var($get('email'), FILTER_VALIDATE_EMAIL)) throw new InvalidArgumentException('Enter a valid email address.');
             if (!ofp_smtp_ready()) throw new InvalidArgumentException('Activation email is unavailable. Contact the site administrator.');
@@ -139,8 +156,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     } catch (InvalidArgumentException $e) { $error = $e->getMessage(); if ($jsonSave) ofp_account_json(['error'=>$error], $errorStatus); }
       catch (Throwable $e) { error_log('OpenFP account page failed: ' . $e->getMessage()); $error = 'Account service unavailable. Try again later.'; if ($jsonSave) ofp_account_json(['error'=>$error], 503); }
 }
+// Failed or non-GET link visits offer sign-in/resending, never a second confirmation step.
+if ($mode === 'verify') $mode = 'activation';
+elseif ($mode === 'confirm_email') $mode = 'login';
 $titles = ['login'=>'Sign in', 'register'=>'Create your account', 'recover'=>'Reset your password',
-    'reset'=>'Choose a new password', 'activation'=>'Activate your account', 'verify'=>'Confirm your email', 'confirm_email'=>'Confirm email change'];
+    'reset'=>'Choose a new password', 'activation'=>'Activate your account'];
 $heading = !empty($_SESSION['account']) ? 'Your cloud profile' : ($titles[$mode] ?? 'Sign in');
 if ($pinPage && in_array($mode, ['login', 'register'], true)) $heading = 'Connect Apple TV';
 $minimum = ofp_account_config()['password_min_length'];
@@ -161,15 +181,7 @@ page_start($pinPage ? 'Connect Apple TV' : 'Cloud account', 'account');
 <?php if ($pinPage && in_array($mode, ['login', 'register'], true)): ?>
   <label>PIN shown on Apple TV <input name="pin" maxlength="9" autocomplete="off" value="<?= h($get('pin')) ?>" required></label>
 <?php endif; ?>
-<?php if ($mode === 'confirm_email'): ?>
-  <input type="hidden" name="email_change_token" value="<?= h($emailToken) ?>">
-  <p>Confirm the new email address you requested. Your username and player settings stay the same.</p>
-  <button class="btn primary" name="action" value="confirm_email">Confirm email change</button>
-<?php elseif ($mode === 'verify'): ?>
-  <input type="hidden" name="verification_token" value="<?= h($verify) ?>">
-  <p>Choose Activate account to confirm your email address and sign in to the website.</p>
-  <button class="btn primary" name="action" value="activate">Activate account</button>
-<?php elseif ($mode === 'activation'): ?>
+<?php if ($mode === 'activation'): ?>
   <p>Activation links are valid for 24 hours. If the email has not arrived, check your spam folder or request a new link below.</p>
   <label>Email <input type="email" name="email" maxlength="254" autocomplete="email" value="<?= h($get('email')) ?>" required></label>
   <button class="btn" name="action" value="resend">Resend activation email</button>

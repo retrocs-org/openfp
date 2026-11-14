@@ -83,7 +83,8 @@ try {
  $db->prepare('INSERT INTO account_email_changes VALUES(?,?,?,?)')->execute([$manage,hash('sha256',$pending),'new@example.invalid',time()-1]);
  account_check(!ofp_account_confirm_email($db,$pending),'expired email confirmation rejected');
  $db->prepare('UPDATE account_email_changes SET expires=? WHERE account_id=?')->execute([time()+60,$manage]);
- account_check(ofp_account_confirm_email($db,$pending)&&!ofp_account_confirm_email($db,$pending),'email confirmation single use');
+ $confirmed=ofp_account_confirm_email($db,$pending);
+ account_check($confirmed && $confirmed['id']===$manage && $confirmed['username']==='Manage' && password_verify('manage-fixture-password',$confirmed['password_hash']) && !ofp_account_confirm_email($db,$pending),'email confirmation returns the verified account once');
  $managed=ofp_account_login($db,'Manage','manage-fixture-password');
  account_check($managed['email']==='new@example.invalid' && (int)$managed['email_verified']===1,'new email confirmed without username change');
  account_reject(fn()=>ofp_account_email_request($db,$manage,'manage-fixture-password','other@example.invalid'),'email change needs SMTP even with activation disabled');

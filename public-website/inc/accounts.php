@@ -142,7 +142,7 @@ function ofp_account_activation_request(PDO $db, string $email): void {
         $db->commit();
     } catch (Throwable $e) { $db->rollBack(); throw $e; }
     $url = rtrim(ofp_settings()['site']['base_url'] ?? 'https://openfp.retrocs.org', '/') . '/account/?verify=' . $token;
-    ofp_smtp_send($email, 'Activate your OpenFP account', "Confirm your email address to activate your OpenFP account. Open this link within 24 hours, then choose Activate account:\n\n$url\n\nIf you did not create this account, ignore this email.");
+    ofp_smtp_send($email, 'Activate your OpenFP account', "Confirm your email address to activate your OpenFP account. Open this link within 24 hours to activate your account and sign in:\n\n$url\n\nIf you did not create this account, ignore this email.");
 }
 function ofp_account_activate(PDO $db, string $token): ?array {
     if (!preg_match('/\A[0-9a-f]{64}\z/D', $token)) return null;
@@ -230,25 +230,25 @@ function ofp_account_email_request(PDO $db, string $id, string $password, string
     } catch (Throwable $e) { $db->rollBack(); throw $e; }
     $url = rtrim(ofp_settings()['site']['base_url'] ?? 'https://openfp.retrocs.org', '/') . '/account/?confirm_email=' . $token;
     try {
-        ofp_smtp_send($email, 'Confirm your new OpenFP email address', "Confirm this new email address for your OpenFP account. Open this link within 24 hours, then choose Confirm email change:\n\n$url\n\nYour current email address stays active until you confirm. If you did not request this change, ignore this email.");
+        ofp_smtp_send($email, 'Confirm your new OpenFP email address', "Confirm this new email address for your OpenFP account. Open this link within 24 hours to confirm the address and sign in:\n\n$url\n\nYour current email address stays active until you confirm. If you did not request this change, ignore this email.");
     } catch (Throwable $e) {
         $db->prepare('DELETE FROM account_email_changes WHERE account_id = ? AND token_hash = ?')->execute([$id, $tokenHash]);
         error_log('OpenFP email change confirmation delivery failed.');
         throw new InvalidArgumentException('The confirmation email could not be sent. Your email address is unchanged. Try again in a minute.');
     }
 }
-function ofp_account_confirm_email(PDO $db, string $token): bool {
-    if (!preg_match('/\A[0-9a-f]{64}\z/D', $token)) return false;
+function ofp_account_confirm_email(PDO $db, string $token): ?array {
+    if (!preg_match('/\A[0-9a-f]{64}\z/D', $token)) return null;
     $db->beginTransaction();
     try {
-        $q = $db->prepare('SELECT a.id, c.new_email FROM accounts a JOIN account_email_changes c ON c.account_id = a.id WHERE c.token_hash = ? AND c.expires > ?' .
+        $q = $db->prepare('SELECT a.id, a.username, a.password_hash, c.new_email FROM accounts a JOIN account_email_changes c ON c.account_id = a.id WHERE c.token_hash = ? AND c.expires > ?' .
             ($db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? '' : ' FOR UPDATE'));
         $q->execute([hash('sha256', $token), time()]); $change = $q->fetch(PDO::FETCH_ASSOC);
-        if (!$change) { $db->rollBack(); return false; }
+        if (!$change) { $db->rollBack(); return null; }
         $db->prepare('UPDATE accounts SET email = ?, email_verified = 1 WHERE id = ?')->execute([$change['new_email'], $change['id']]);
         foreach (['account_email_changes','account_resets','account_verifications'] as $table)
             $db->prepare("DELETE FROM $table WHERE account_id = ?")->execute([$change['id']]);
-        $db->commit(); return true;
+        $db->commit(); return $change;
     } catch (Throwable $e) {
         $db->rollBack();
         if ($e instanceof PDOException && in_array((string)$e->getCode(), ['23000','23505'], true))

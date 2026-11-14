@@ -63,6 +63,7 @@ for (const form of document.querySelectorAll('.account-profile-form')) {
       if (!response.ok || result.status !== 'saved')
         throw new Error(result.error || 'Your changes could not be saved. Try again.');
       saved = snapshot;
+      document.dispatchEvent(new CustomEvent('ofp-profile-saved', {detail:{avatar:Number(body.get('avatar'))}}));
       message(values() === saved ? 'All changes saved.' : 'Saving changes…', values() === saved ? 'saved' : 'pending');
     } catch (error) {
       saved = null; // A lost response may still have committed: retry the complete selection.

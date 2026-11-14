@@ -14,6 +14,40 @@
   revealAnchor();
   window.addEventListener('hashchange', revealAnchor);
 
+  // Keep the account cookie scoped to /account/ while showing its avatar on every page.
+  var accountLink = document.querySelector('[data-account-link]');
+  var accountProfile = null;
+  function showAccount(profile) {
+    accountProfile = profile;
+    accountLink.classList.toggle('nav-account-signed-in', !!profile);
+    if (!profile) {
+      accountLink.textContent = 'Account';
+      accountLink.removeAttribute('title');
+      accountLink.removeAttribute('aria-label');
+      return;
+    }
+    var avatar = document.createElement('span');
+    avatar.className = 'nav-account-avatar';
+    avatar.style.setProperty('--avatar', profile.avatar);
+    avatar.setAttribute('aria-hidden', 'true');
+    accountLink.replaceChildren(avatar);
+    accountLink.title = 'Account: ' + profile.username;
+    accountLink.setAttribute('aria-label', 'Account: ' + profile.username);
+  }
+  function refreshAccount() {
+    if (!accountLink || !window.fetch) return;
+    fetch('/account/status.php', {credentials:'same-origin', cache:'no-store'})
+      .then(function (response) { if (!response.ok) throw new Error('Account unavailable'); return response.json(); })
+      .then(function (data) { showAccount(data.profile); })
+      .catch(function () {});
+  }
+  refreshAccount();
+  window.addEventListener('pageshow', function (event) { if (event.persisted) refreshAccount(); });
+  document.addEventListener('ofp-profile-saved', function (event) {
+    if (accountProfile) showAccount({username:accountProfile.username, avatar:event.detail.avatar});
+    else refreshAccount();
+  });
+
   // screenshots, big
   document.addEventListener('click', function (e) {
     var a = e.target.closest('a[data-zoom]');

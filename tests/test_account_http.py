@@ -58,12 +58,12 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
                 with socket.create_connection(('127.0.0.1', port), timeout=.1): break
             except OSError: time.sleep(.05)
         fixture_ip = '127.0.0.1'
-        def request(path, values=None, cookie='', insecure=False):
+        def request(path, values=None, cookie='', insecure=False, method=None):
             connection = http.client.HTTPConnection('127.0.0.1', port, timeout=20)
             headers = {'Cookie': cookie, 'X-Forwarded-For': fixture_ip}
             if insecure: headers['X-OFP-Fixture-Insecure'] = '1'
             if values is not None: headers['Content-Type'] = 'application/x-www-form-urlencoded'
-            connection.request('POST' if values is not None else 'GET', path,
+            connection.request(method or ('POST' if values is not None else 'GET'), path,
                                urllib.parse.urlencode(values) if values is not None else None, headers)
             response = connection.getresponse()
             result = response.status, dict(response.getheaders()), response.read().decode()
@@ -78,6 +78,11 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
         def session(headers): return headers['Set-Cookie'].split(';', 1)[0]
         assert request('/account/api/', {'action': 'login'}, insecure=True)[0] == 426
         assert request('/account/api/')[0] == 405
+        status, headers, body = request('/account/status.php')
+        assert status == 200 and json.loads(body) == {'profile': None}
+        assert 'no-store' in headers['Cache-Control'] and 'Set-Cookie' not in headers
+        assert headers['Content-Type'].startswith('application/json')
+        assert request('/account/status.php', {})[0] == 405
         assert request('/api/', {'action': 'announce', 'port': 29870})[0] == 403
         name = 'Http' + os.urandom(4).hex()
         password = 'http-fixture-password-123'
@@ -97,6 +102,10 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
         assert 'Apple TV connected' in body
         assert session(headers) != cookie  # successful login rotates the browser session
         cookie = session(headers)
+        status, headers, identity = request('/account/status.php', cookie=cookie)
+        assert status == 200 and json.loads(identity) == {'profile': {'username': name, 'avatar': 0}}
+        assert 'no-store' in headers['Cache-Control']
+        assert json.loads(request('/account/status.php', cookie=cookie, insecure=True)[2]) == {'profile': None}
         paired = api({'action': 'device_poll', 'device': device['device']})
         assert paired['id'] == account['id'] and paired['key'] == account['key']
         api({'action': 'device_poll', 'device': device['device']}, 202)
@@ -119,6 +128,8 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
         _, _, settings = request('/account/',cookie=cookie)
         assert all(label in settings for label in ['Player settings','Favorite tank','Avatar','Changes save automatically.','Delete account','tank-picker','Previous tank','Rescue capacity'])
         assert '<h3>Steering</h3>' not in settings and 'name="steering"' not in settings
+        assert 'data-account-link' in settings
+        assert json.loads(request('/account/status.php', cookie=cookie)[2]) == {'profile': {'username': name, 'avatar': 9}}
         _, _, denied = request('/account/',{'action':'profile_save','csrf':'bad','favorite_tank':0,'avatar':0,'steering':0},cookie)
         assert 'Reload the page' in denied
         status, headers, _ = request('/account/',{'action':'profile_save','csrf':csrf(settings),'favorite_tank':2,'avatar':5,'steering':0},cookie)
@@ -128,6 +139,7 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
         # Autosaves return JSON, preserve client steering and do not consume the login limiter.
         status, _, saved = request('/account/', {'action':'profile_save','format':'json','csrf':csrf(settings),'favorite_tank':1,'avatar':2,'username':'Hacked'},cookie)
         assert status==200 and json.loads(saved)=={'status':'saved'}
+        assert json.loads(request('/account/status.php', cookie=cookie)[2]) == {'profile': {'username': name, 'avatar': 2}}
         status, _, denied = request('/account/', {'action':'profile_save','format':'json','csrf':'bad','favorite_tank':0,'avatar':0},cookie)
         assert status==403 and 'error' in json.loads(denied)
         status, _, denied = request('/account/', {'action':'profile_save','format':'json','csrf':csrf(settings),'favorite_tank':9,'avatar':0},cookie)
@@ -178,6 +190,7 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
             _, _, body = request('/account/?reset='+reset, cookie=cookie)
             _, _, body = request('/account/', {'action': 'reset', 'csrf': csrf(body), 'reset_token': reset, 'password': 'new-http-fixture-password'}, cookie)
             assert 'Password changed' in body
+            assert json.loads(request('/account/status.php', cookie=cookie)[2]) == {'profile': None}
             api({'action': 'login', 'username': name, 'password': password}, 401)
             api({'action': 'login', 'username': name, 'password': 'new-http-fixture-password'})
             api(dict(binding, action='ticket', session=account['session']), 401)
@@ -214,15 +227,17 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
                                     'username':pending_name, 'password':'test'}, browser)
             assert 'Activate your account using the email link' in denied and 'Apple TV connected' not in denied
             activation = re.search(r'/account/\?verify=([0-9a-f]{64})', delivered[-1]).group(1)
-            _, _, body = request('/account/?verify='+activation, cookie=browser)
-            assert 'Activate account' in body  # opening a link does not activate it
+            # Insecure and HEAD requests must not consume a valid emailed token.
+            _, _, bad = request('/account/?verify='+activation, cookie=browser, insecure=True)
+            assert 'Use HTTPS to confirm your email' in bad and 'Signed in as' not in bad
+            assert request('/account/?verify='+activation, cookie=browser, method='HEAD')[0] == 200
             api({'action':'login', 'username':pending_name, 'password':'test'}, 400)
             def database(code, *args):
                 return subprocess.check_output(['php','-r','require $argv[1]."/inc/accounts.php"; $db=ofp_db(); '+code,
                                                 str(fixture), *args], env=env).decode()
             assert database('$q=$db->prepare("SELECT v.token_hash FROM account_verifications v JOIN accounts a ON a.id=v.account_id WHERE a.username=?"); $q->execute([$argv[2]]); echo $q->fetchColumn();', pending_name) == hashlib.sha256(activation.encode()).hexdigest()
             database('$q=$db->prepare("UPDATE account_verifications v JOIN accounts a ON a.id=v.account_id SET v.expires=1 WHERE a.username=?"); $q->execute([$argv[2]]);', pending_name)
-            _, _, expired = request('/account/', {'action':'activate','csrf':csrf(body),'verification_token':activation}, browser)
+            _, _, expired = request('/account/?verify='+activation, cookie=browser)
             assert 'activation link has expired' in expired, re.findall(r'<p[^>]*role="alert"[^>]*>(.*?)</p>', expired)
             assert 'Signed in as' not in expired
             _, _, body = request('/account/?mode=activation', cookie=browser)
@@ -233,14 +248,14 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
             assert len(delivered) == 4
             replacement = re.search(r'/account/\?verify=([0-9a-f]{64})', delivered[-1]).group(1)
             assert replacement != activation
-            _, _, bad = request('/account/', {'action':'activate','csrf':csrf(body),'verification_token':activation}, browser)
+            _, _, bad = request('/account/?verify='+activation, cookie=browser)
             assert 'activation link has expired' in bad
             assert 'Signed in as' not in bad
             _, _, bad = request('/account/', {'action':'activate','csrf':'wrong','verification_token':replacement}, browser)
             assert 'Reload the page' in bad
             assert 'Signed in as' not in bad
             old_csrf = csrf(body)
-            status, headers, _ = request('/account/', {'action':'activate','csrf':old_csrf,'verification_token':replacement}, browser)
+            status, headers, _ = request('/account/?verify='+replacement, cookie=browser)
             assert status == 303 and headers['Location'] == '/account/'
             signed_browser = session(headers)
             assert signed_browser != browser
@@ -258,7 +273,7 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
             browser = session(headers)
             active = api({'action':'login','username':pending_name,'password':'test'})
             assert len(active['session']) == 64
-            _, _, body = request('/account/', {'action':'activate','csrf':csrf(anonymous),'verification_token':replacement}, browser)
+            _, _, body = request('/account/?verify='+replacement, cookie=browser)
             assert 'activation link has expired' in body
             assert 'Signed in as' not in body  # a used token cannot create another authenticated session
             # Browser account controls: new email needs proof, username stays fixed, password revokes access.
@@ -266,10 +281,11 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
             manage_name='Edit'+os.urandom(3).hex()
             managed=api({'action':'register','username':manage_name,'email':manage_name+'@example.invalid','password':'test'},202)
             activate=re.search(r'/account/\?verify=([0-9a-f]{64})',delivered[-1]).group(1)
-            _, mh, mb=request('/account/?verify='+activate)
+            # Verification signs in to the account from the link, even if another account is open.
+            status, mh, _=request('/account/?verify='+activate,cookie=signed_browser)
+            assert status==303 and mh['Location']=='/account/'
             mc=session(mh)
-            _, mh, _=request('/account/',{'action':'activate','verification_token':activate,'csrf':csrf(mb)},mc)
-            mc=session(mh)
+            assert mc!=signed_browser
             _, _, mb=request('/account/',cookie=mc)
             active_managed=api({'action':'login','username':manage_name,'password':'test'})
             second_browser=request('/account/')
@@ -288,15 +304,20 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
             email_link=re.search(r'/account/\?confirm_email=([0-9a-f]{64})',delivered[-1]).group(1)
             assert database('$q=$db->prepare("SELECT email FROM accounts WHERE username=?");$q->execute([$argv[2]]);echo $q->fetchColumn();',manage_name)==manage_name.lower()+'@example.invalid'
             assert database('$q=$db->prepare("SELECT token_hash FROM account_email_changes WHERE account_id=?");$q->execute([$argv[2]]);echo $q->fetchColumn();',active_managed['id'])==hashlib.sha256(email_link.encode()).hexdigest()
-            # GET does not confirm (mail scanners may open the link).
-            _, _, mb=request('/account/?confirm_email='+email_link,cookie=mc)
-            assert 'Confirm email change' in mb
+            # Opening the email-change link confirms and signs in without an existing browser session.
+            assert request('/account/?confirm_email='+email_link,method='HEAD')[0]==200
+            _, _, bad=request('/account/?confirm_email='+email_link,insecure=True)
+            assert 'Use HTTPS to confirm your email' in bad
             assert database('$q=$db->prepare("SELECT email FROM accounts WHERE username=?");$q->execute([$argv[2]]);echo $q->fetchColumn();',manage_name)==manage_name.lower()+'@example.invalid'
-            status, _, _=request('/account/',{'action':'confirm_email','email_change_token':email_link,'csrf':csrf(mb)},mc)
-            assert status==303
+            status, mh, _=request('/account/?confirm_email='+email_link)
+            assert status==303 and mh['Location']=='/account/'
+            mc=session(mh)
+            _, _, mb=request('/account/',cookie=mc)
+            assert 'Your new email address is confirmed and you are signed in.' in mb
+            assert f'Signed in as <strong>{manage_name}</strong>' in mb
             assert database('$q=$db->prepare("SELECT email FROM accounts WHERE username=?");$q->execute([$argv[2]]);echo $q->fetchColumn();',manage_name)==new_email.lower()
-            _, _, bad=request('/account/',{'action':'confirm_email','email_change_token':email_link,'csrf':csrf(mb)},mc)
-            assert 'link has expired or was already used' in bad
+            _, _, bad=request('/account/?confirm_email='+email_link)
+            assert 'link has expired or was already used' in bad and 'Signed in as' not in bad
             assert api({'action':'profile','session':active_managed['session']})['username']==manage_name
             # Permit another request, cancel it, and prove its token cannot change the email.
             database('$db->exec("DELETE FROM account_limits");')
@@ -304,7 +325,7 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
             request('/account/',dict(changes,csrf=csrf(mb),new_email=manage_name+'-cancel@example.invalid'),mc)
             cancelled=re.search(r'/account/\?confirm_email=([0-9a-f]{64})',delivered[-1]).group(1)
             request('/account/',{'action':'cancel_email','csrf':csrf(mb)},mc)
-            _, _, bad=request('/account/',{'action':'confirm_email','email_change_token':cancelled,'csrf':csrf(mb)},mc)
+            _, _, bad=request('/account/?confirm_email='+cancelled,cookie=mc)
             assert 'link has expired' in bad
             password_change={'action':'change_password','csrf':csrf(mb),'current_password':'test','new_password':'replacement-pass','confirm_password':'other'}
             assert 'do not match' in request('/account/',password_change,mc)[2]
@@ -393,7 +414,7 @@ with tempfile.TemporaryDirectory(prefix='openfp-account-http-') as directory:
             assert late['players'][0]['score']==90 and late['players'][0]['deleted']==1
             smtp.shutdown()
             mail_thread.join(timeout=10)
-        print('account HTTP: autosave, immutable usernames, confirmed email replacement/cancellation, password change and session revocation; visible validation, configurable passwords, activation email/expiry/resend, automatic browser sign-in, pending-account denial, optional activation, PIN pairing, tickets, password recovery, shared profile settings and confirmed account deletion passed')
+        print('account HTTP: autosave, immutable usernames, confirmed email replacement/cancellation, password change and session revocation; visible validation, configurable passwords, activation email/expiry/resend, one-click verification and browser sign-in, pending-account denial, optional activation, PIN pairing, tickets, password recovery, shared profile settings and confirmed account deletion passed')
     finally:
         process.terminate()
         process.wait(timeout=10)

@@ -23,10 +23,12 @@ page_start('Maps', 'maps', 'Browse the maps included in OpenFP and the maps shar
   <form class="toolbar map-filters" method="get" action="/maps/" aria-label="Filter maps">
     <label>World<select name="world"><?php foreach ($worlds as $key => $label): ?><option value="<?= h($key) ?>"<?= $world === $key ? ' selected' : '' ?>><?= h($label) ?></option><?php endforeach; ?></select></label>
     <label>Game mode<select name="mode"><?php foreach ($modes as $key => $label): ?><option value="<?= h($key) ?>"<?= $mode === $key ? ' selected' : '' ?>><?= h($label) ?></option><?php endforeach; ?></select></label>
-    <button class="btn small primary" type="submit">Apply filters</button>
-    <?php if ($world !== '' || $mode !== ''): ?><a class="text-link" href="/maps/">Clear filters</a><?php endif; ?>
+    <noscript><button class="btn small primary" type="submit">Filter maps</button></noscript>
+    <a class="text-link" href="/maps/" data-clear-map-filters<?= $world === '' && $mode === '' ? ' hidden' : '' ?>>Clear filters</a>
   </form>
 
+  <p class="map-filter-status" role="status" data-map-filter-status></p>
+  <div data-map-results>
   <h2 id="bundled">Bundled maps</h2>
   <?php if ($catalog === null): ?>
     <p class="notice">The bundled map catalog is temporarily unavailable.</p>
@@ -72,34 +74,7 @@ page_start('Maps', 'maps', 'Browse the maps included in OpenFP and the maps shar
       <?php endforeach; ?>
     </div>
   <?php endif; ?>
+  </div>
 </section>
-<script>
-// Request community map previews in batches of up to 60.
-(function () {
-  var ground = { classic: '#6f8d3a', desert: '#d8b878', jungle: '#3f7a2a', winter: '#e8eef2', scifi: '#3a3f48',
-                 volcanic: '#3a3230', wasteland: '#8a7448', moon: '#9a9aa2', swamp: '#4a5a32' };
-  var colour = { '=': '#707070', '~': '#2f68b8', '^': '#5a5048', 'T': '#2c5a1e', ',': '#6a5a3a', '#': '#9a8f80', ':': '#857a6c',
-                 'x': '#4a4038', 'P': '#3b82ff', 'E': '#ff4030', 'p': '#9cc0ff', 'e': '#ff9a88', 'i': '#d25ff0' };
-  var canvases = Array.prototype.slice.call(document.querySelectorAll('canvas[data-map]'));
-  for (var start = 0; start < canvases.length; start += 60) {
-    drawPreviews(canvases.slice(start, start + 60));
-  }
-  function drawPreviews(canvases) {
-    fetch('/api/?action=map_thumbs&ids=' + canvases.map(function (c) { return c.dataset.map; }).join(','))
-      .then(function (r) { return r.json(); }).then(function (thumbs) {
-        canvases.forEach(function (c) {
-          var t = thumbs[c.dataset.map], g = c.getContext('2d'), i;
-          g.fillStyle = ground[c.dataset.world] || ground.classic; g.fillRect(0, 0, 128, 128);
-          if (!t) return;
-          for (i = 0; i < t.length; i++) {
-            var k = t.charAt(i), big = 'PE'.indexOf(k) >= 0;
-            if (!colour[k]) continue;
-            g.fillStyle = c.dataset.world === 'moon' && k === '~' ? '#302f37' : colour[k];
-            g.fillRect((i % 64) * 2 - (big ? 2 : 0), Math.floor(i / 64) * 2 - (big ? 2 : 0), big ? 6 : 2, big ? 6 : 2);
-          }
-        });
-      }).catch(function () {});
-  }
-})();
-</script>
+<script src="<?= h(site_asset('assets/maps.js')) ?>" defer></script>
 <?php page_end();

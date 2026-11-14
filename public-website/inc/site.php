@@ -79,7 +79,7 @@ function page_start(string $title, string $page, string $description = ''): void
     <a class="brand" href="/"><img src="/assets/favicon.svg" alt="" width="28" height="28"><span>Open<b>FP</b></span></a>
     <nav aria-label="Main navigation">
       <?php foreach ($nav as $key => [$label, $href]): ?>
-        <a href="<?= h($href) ?>"<?= $key === $page ? ' aria-current="page"' : '' ?>><?= h($label) ?></a>
+        <a href="<?= h($href) ?>"<?= $key === 'account' ? ' data-account-link' : '' ?><?= $key === $page ? ' aria-current="page"' : '' ?>><?= h($label) ?></a>
       <?php endforeach; ?>
     </nav>
     <a class="nav-download" href="/#get">Get the game <span aria-hidden="true">↗</span></a>
